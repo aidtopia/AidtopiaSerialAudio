@@ -1,0 +1,7 @@
+# Existence of a .development file in the root library folder allows
+# editing of the library files.  We don't want to check that in.
+.development
+
+# This batch file copies the library from my local git repo to the
+# installed Arduino libraries directory.
+deploy.bat
