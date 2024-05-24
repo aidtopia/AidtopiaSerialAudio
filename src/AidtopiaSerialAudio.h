@@ -1,10 +1,13 @@
-// AudioModule
+// AidtopiaSerialAudio
 // Adrian McCarthy 2018-
 
 // A library that works with various serial audio modules,
 // like DFPlayer Mini, Catalex, etc.
 
-#include "timeout.h"
+#ifndef AIDTOPIASERIALAUDIO_H
+#define AIDTOPIASERIALAUDIO_H
+
+#include <utilities/timeout.h>
 
 class BasicAudioModule {
   public:
@@ -978,3 +981,5 @@ BasicAudioModule::InitSelectingUSB         BasicAudioModule::s_init_selecting_us
 BasicAudioModule::InitSelectingSD          BasicAudioModule::s_init_selecting_sd;
 BasicAudioModule::InitCheckingFolderCount  BasicAudioModule::s_init_checking_folder_count;
 BasicAudioModule::InitStartPlaying         BasicAudioModule::s_init_start_playing;
+
+#endif
