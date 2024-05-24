@@ -7,14 +7,20 @@
 #ifndef AIDTOPIASERIALAUDIO_H
 #define AIDTOPIASERIALAUDIO_H
 
+#include <Arduino.h>
 #include <utilities/timeout.h>
 
-class BasicAudioModule {
+class Aidtopia_SerialAudio {
   public:
-    explicit BasicAudioModule(Stream &stream) :
-      m_stream(stream), m_in(), m_out(), m_state(nullptr), m_timeout() {}
+    explicit Aidtopia_SerialAudio() :
+      m_stream(nullptr), m_in(), m_out(), m_state(nullptr), m_timeout() {}
 
-    virtual void begin() { reset(); }
+    template <typename StreamType>
+    void begin(StreamType &stream) {
+        stream.begin(9600);
+        m_stream = &stream;
+        reset();
+    }
 
     // Call each time through `loop`.
     void update() {
@@ -696,7 +702,7 @@ class BasicAudioModule {
         // or a pointer to another State in order to chain a series of
         // operations together.
         virtual State *onEvent(
-          BasicAudioModule * /*module*/,
+          Aidtopia_SerialAudio * /*module*/,
           MsgID /*msgid*/,
           uint8_t /*paramHi*/,
           uint8_t /*paramLo*/
@@ -707,7 +713,7 @@ class BasicAudioModule {
 
     struct InitResettingHardware : public State {
       State *onEvent(
-          BasicAudioModule *module,
+          Aidtopia_SerialAudio *module,
           MsgID msgid,
           uint8_t paramHi,
           uint8_t paramLo
@@ -720,7 +726,7 @@ class BasicAudioModule {
             module->m_timeout.set(10000);
             return this;
           case MID_INITCOMPLETE:
-            return &BasicAudioModule::s_init_getting_version;
+            return &Aidtopia_SerialAudio::s_init_getting_version;
           case MID_ERROR:
             if (combine(paramHi, paramLo) == EC_TIMEDOUT) {
               Serial.println(F("No response from audio module"));
@@ -734,7 +740,7 @@ class BasicAudioModule {
     static InitResettingHardware s_init_resetting_hardware;
 
     struct InitGettingVersion : public State {
-      State *onEvent(BasicAudioModule *module, MsgID msgid, uint8_t paramHi, uint8_t paramLo) override {
+      State *onEvent(Aidtopia_SerialAudio *module, MsgID msgid, uint8_t paramHi, uint8_t paramLo) override {
         switch (msgid) {
           case MID_ENTERSTATE:
             module->queryFirmwareVersion();
@@ -754,10 +760,10 @@ class BasicAudioModule {
     static InitGettingVersion s_init_getting_version;
 
     struct InitCheckingUSBFileCount : public State {
-      State *onEvent(BasicAudioModule *module, MsgID msgid, uint8_t paramHi, uint8_t paramLo) override {
+      State *onEvent(Aidtopia_SerialAudio *module, MsgID msgid, uint8_t paramHi, uint8_t paramLo) override {
         switch (msgid) {
           case MID_ENTERSTATE:
-            module->queryFileCount(BasicAudioModule::DEV_USB);
+            module->queryFileCount(Aidtopia_SerialAudio::DEV_USB);
             return this;
           case MID_USBFILECOUNT: {
             const auto count = (static_cast<uint16_t>(paramHi) << 8) | paramLo;
@@ -775,10 +781,10 @@ class BasicAudioModule {
     static InitCheckingUSBFileCount s_init_checking_usb_file_count;
     
     struct InitCheckingSDFileCount : public State {
-      State *onEvent(BasicAudioModule *module, MsgID msgid, uint8_t paramHi, uint8_t paramLo) override {
+      State *onEvent(Aidtopia_SerialAudio *module, MsgID msgid, uint8_t paramHi, uint8_t paramLo) override {
         switch (msgid) {
           case MID_ENTERSTATE:
-            module->queryFileCount(BasicAudioModule::DEV_SDCARD);
+            module->queryFileCount(Aidtopia_SerialAudio::DEV_SDCARD);
             return this;
           case MID_SDFILECOUNT: {
             const auto count = (static_cast<uint16_t>(paramHi) << 8) | paramLo;
@@ -797,17 +803,17 @@ class BasicAudioModule {
 
     struct InitSelectingUSB : public State {
       State *onEvent(
-        BasicAudioModule *module,
+        Aidtopia_SerialAudio *module,
         MsgID msgid,
         uint8_t /*paramHi*/,
         uint8_t /*paramLo*/
       ) override {
         switch (msgid) {
           case MID_ENTERSTATE:
-            module->selectSource(BasicAudioModule::DEV_USB);
+            module->selectSource(Aidtopia_SerialAudio::DEV_USB);
             return this;
           case MID_ACK:
-            module->m_source = BasicAudioModule::DEV_USB;
+            module->m_source = Aidtopia_SerialAudio::DEV_USB;
             return &s_init_checking_folder_count;
           default: break;
         }
@@ -818,17 +824,17 @@ class BasicAudioModule {
 
     struct InitSelectingSD : public State {
       State *onEvent(
-        BasicAudioModule *module,
+        Aidtopia_SerialAudio *module,
         MsgID msgid,
         uint8_t /*paramHi*/,
         uint8_t /*paramLo*/
       ) override {
         switch (msgid) {
           case MID_ENTERSTATE:
-            module->selectSource(BasicAudioModule::DEV_SDCARD);
+            module->selectSource(Aidtopia_SerialAudio::DEV_SDCARD);
             return this;
           case MID_ACK:
-            module->m_source = BasicAudioModule::DEV_SDCARD;
+            module->m_source = Aidtopia_SerialAudio::DEV_SDCARD;
             return &s_init_checking_folder_count;
           default: break;
         }
@@ -839,7 +845,7 @@ class BasicAudioModule {
 
     struct InitCheckingFolderCount : public State {
       State *onEvent(
-        BasicAudioModule *module,
+        Aidtopia_SerialAudio *module,
         MsgID msgid,
         uint8_t /*paramHi*/,
         uint8_t paramLo
@@ -867,7 +873,7 @@ class BasicAudioModule {
 
     struct InitStartPlaying : public State {
       State *onEvent(
-        BasicAudioModule *module,
+        Aidtopia_SerialAudio *module,
         MsgID msgid,
         uint8_t /*paramHi*/,
         uint8_t /*paramLo*/
@@ -886,8 +892,8 @@ class BasicAudioModule {
     static InitStartPlaying s_init_start_playing;
 
     void checkForIncomingMessage() {
-      while (m_stream.available() > 0) {
-        if (m_in.receive(m_stream.read())) {
+      while (m_stream->available() > 0) {
+        if (m_in.receive(m_stream->read())) {
           receiveMessage(m_in);
         }
       }
@@ -912,7 +918,7 @@ class BasicAudioModule {
     void sendMessage(const Message &msg) {
       const auto buf = msg.getBuffer();
       const auto len = msg.getLength();
-      m_stream.write(buf, len);
+      m_stream->write(buf, len);
       m_timeout.set(200);
       onMessageSent(buf, len);
     }
@@ -942,7 +948,7 @@ class BasicAudioModule {
     // TODO:  Guess the module type.
     enum Module { MOD_UNKNOWN, MOD_CATALEX, MOD_DFPLAYERMINI };
 
-    Stream  &m_stream;
+    Stream  *m_stream;
     Message  m_in;
     Message  m_out;
     State   *m_state;
@@ -952,34 +958,13 @@ class BasicAudioModule {
     uint8_t  m_folders;  // the number of folders on the selected device
 };
 
-template <typename SerialType>
-class AudioModule : public BasicAudioModule {
-  public:
-    explicit AudioModule(SerialType &serial) :
-      BasicAudioModule(serial), m_serial(serial) {}
-
-    // Initialization to be done during `setup`.
-    void begin() override {
-      m_serial.begin(9600);
-      BasicAudioModule::begin();
-    }
-
-  private:
-    SerialType &m_serial;
-};
-
-template <typename SerialType>
-AudioModule<SerialType> make_AudioModule(SerialType &serial) {
-  return AudioModule<SerialType>(serial);
-}
-
-BasicAudioModule::InitResettingHardware    BasicAudioModule::s_init_resetting_hardware;
-BasicAudioModule::InitGettingVersion       BasicAudioModule::s_init_getting_version;
-BasicAudioModule::InitCheckingUSBFileCount BasicAudioModule::s_init_checking_usb_file_count;
-BasicAudioModule::InitCheckingSDFileCount  BasicAudioModule::s_init_checking_sd_file_count;
-BasicAudioModule::InitSelectingUSB         BasicAudioModule::s_init_selecting_usb;
-BasicAudioModule::InitSelectingSD          BasicAudioModule::s_init_selecting_sd;
-BasicAudioModule::InitCheckingFolderCount  BasicAudioModule::s_init_checking_folder_count;
-BasicAudioModule::InitStartPlaying         BasicAudioModule::s_init_start_playing;
+Aidtopia_SerialAudio::InitResettingHardware    Aidtopia_SerialAudio::s_init_resetting_hardware;
+Aidtopia_SerialAudio::InitGettingVersion       Aidtopia_SerialAudio::s_init_getting_version;
+Aidtopia_SerialAudio::InitCheckingUSBFileCount Aidtopia_SerialAudio::s_init_checking_usb_file_count;
+Aidtopia_SerialAudio::InitCheckingSDFileCount  Aidtopia_SerialAudio::s_init_checking_sd_file_count;
+Aidtopia_SerialAudio::InitSelectingUSB         Aidtopia_SerialAudio::s_init_selecting_usb;
+Aidtopia_SerialAudio::InitSelectingSD          Aidtopia_SerialAudio::s_init_selecting_sd;
+Aidtopia_SerialAudio::InitCheckingFolderCount  Aidtopia_SerialAudio::s_init_checking_folder_count;
+Aidtopia_SerialAudio::InitStartPlaying         Aidtopia_SerialAudio::s_init_start_playing;
 
 #endif
