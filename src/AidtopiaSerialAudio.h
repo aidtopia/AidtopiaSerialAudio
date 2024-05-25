@@ -12,21 +12,15 @@
 
 class Aidtopia_SerialAudio {
   public:
-    explicit Aidtopia_SerialAudio() :
-      m_stream(nullptr), m_in(), m_out(), m_state(nullptr), m_timeout() {}
+    explicit Aidtopia_SerialAudio();
 
+    // Call `begin` in `setup` an instance of the HardwareSerial (e.g., Serial1)
+    // or a SoftwareSerial object that the audio module is connected too.
     template <typename StreamType>
-    void begin(StreamType &stream) {
-        stream.begin(9600);
-        m_stream = &stream;
-        reset();
-    }
+    void begin(StreamType &stream);
 
-    // Call each time through `loop`.
-    void update() {
-      checkForIncomingMessage();
-      checkForTimeout();
-    }
+    // Call `update` each time through `loop`.
+    void update();
 
     enum Device {
       DEV_USB,      // a storage device connected via USB
@@ -40,30 +34,41 @@ class Aidtopia_SerialAudio {
       DEV_SPI = DEV_FLASH   // The internal flash memory is an SPI device
     };
 
-    enum Equalizer { EQ_NORMAL, EQ_POP, EQ_ROCK, EQ_JAZZ, EQ_CLASSICAL, EQ_BASS };
-    enum ModuleState { MS_STOPPED, MS_PLAYING, MS_PAUSED, MS_ASLEEP };
-    enum Sequence { SEQ_LOOPALL, SEQ_LOOPFOLDER, SEQ_LOOPTRACK, SEQ_RANDOM, SEQ_SINGLE };
+    enum Equalizer {
+      EQ_NORMAL,
+      EQ_POP,
+      EQ_ROCK,
+      EQ_JAZZ,
+      EQ_CLASSICAL,
+      EQ_BASS
+    };
+
+    enum ModuleState {
+      MS_STOPPED,
+      MS_PLAYING,
+      MS_PAUSED,
+      MS_ASLEEP
+    };
+
+    enum Sequence {
+      SEQ_LOOPALL,
+      SEQ_LOOPFOLDER,
+      SEQ_LOOPTRACK,
+      SEQ_RANDOM,
+      SEQ_SINGLE
+    };
 
     // Reset and re-initialize the audio module.
     // 
     // Resetting causes an unavoidable click on the output.
-    void reset() {
-      setState(&s_init_resetting_hardware);
-    }
+    void reset();
 
     // Select a Device to be the current source.
     //
     // Many modules select `DEV_SDCARD` by default, which is usually
     // appropriate, but it's good practice to select it yourself to be
     // certain.
-    void selectSource(Device device) {
-      switch (device) {
-        case DEV_USB:    sendCommand(MID_SELECTSOURCE, 1); break;
-        case DEV_SDCARD: sendCommand(MID_SELECTSOURCE, 2); break;
-        case DEV_FLASH:  sendCommand(MID_SELECTSOURCE, 5); break;
-        default: break;
-      }
-    }
+    void selectSource(Device device);
     
     // Play a file selected by its file system index.
     //
@@ -75,49 +80,36 @@ class Aidtopia_SerialAudio {
     // files are available.
     //
     // Corresponds to playback sequence `SEQ_SINGLE`.
-    void playFile(uint16_t file_index) { sendCommand(MID_PLAYFILE, file_index); }
+    void playFile(uint16_t file_index);
 
     // Play the next file based on the current file index.
-    void playNextFile() { sendCommand(MID_PLAYNEXT); }
+    void playNextFile();
 
     // Play the previous file based on the current file index.
-    void playPreviousFile() { sendCommand(MID_PLAYPREVIOUS); }
+    void playPreviousFile();
 
     // Play a single file repeatedly.
     //
     // Corresponds to playback sequence `SEQ_LOOPTRACK`.
-    void loopFile(uint16_t file_index) { sendCommand(MID_LOOPFILE, file_index); }
+    void loopFile(uint16_t file_index);
 
     // Play all the files on the device, in file index order, repeatedly.
     //
     // Corresponds to playback sequence `SEQ_LOOPALL`.
-    void loopAllFiles() { sendCommand(MID_LOOPALL, 1); }
+    void loopAllFiles();
 
     // Play all the files on the current device in a random order.
     //
     // TBD: Does it repeat once it has played all of them?
     //
     // Corresponds to playback sequence `SEQ_RANDOM`.
-    void playFilesInRandomOrder() { sendCommand(MID_RANDOMPLAY); }
+    void playFilesInRandomOrder();
     
     // playTrack lets you specify a folder named with two decimal
     // digits, like "01" or "02", and a track whose name begins
     // with three decimal digits like "001.mp3" or
     // "014 Yankee Doodle.wav".
-    void playTrack(uint16_t folder, uint16_t track) {
-      // Under the hood, there are a couple different command
-      // messages to achieve this. We'll automatically select the
-      // most appropriate one based on the values.
-      if (track < 256) {
-        const uint16_t param = (folder << 8) | track;
-        sendCommand(MID_PLAYFROMFOLDER, param);
-      } else if (folder < 16 && track <= 3000) {
-        // For folders with more than 255 tracks, we have this
-        // alternative command.
-        const uint16_t param = (folder << 12) | track;
-        sendCommand(MID_PLAYFROMBIGFOLDER, param);
-      }
-    }
+    void playTrack(uint16_t folder, uint16_t track);
 
     // This overload lets you select a track whose file name begins
     // with a three or four decimal digit number, like "001" or "2432".
@@ -128,7 +120,7 @@ class Aidtopia_SerialAudio {
     //
     // Even though the folder is named "MP3", it may contain .wav
     // files as well.
-    void playTrack(uint16_t track) { sendCommand(MID_PLAYFROMMP3, track); }
+    void playTrack(uint16_t track);
 
     // Insert an "advertisement."
     //
@@ -146,18 +138,18 @@ class Aidtopia_SerialAudio {
     // stopped or paused), this will result in an "insertion error."
     //
     // You cannot insert while an inserted track is alrady playing.
-    void insertAdvert(uint16_t track) { sendCommand(MID_INSERTADVERT, track); }
+    void insertAdvert(uint16_t track);
 
     // Stops a track that was inserted with `insertAdvert`.  The
     // interrupted track will resume from where it was.
-    void stopAdvert() { sendCommand(MID_STOPADVERT); }
+    void stopAdvert();
 
     // Stops any audio that's playing and resets the playback
     // sequence to `SEQ_SINGLE`.
-    void stop() { sendCommand(MID_STOP); }
+    void stop();
 
     // Pauses the current playback.
-    void pause() { sendCommand(MID_PAUSE); }
+    void pause();
 
     // Undoes a previous call to `pause`.
     //
@@ -166,90 +158,69 @@ class Aidtopia_SerialAudio {
     // is cued up and paused.  If you call this function about 100 ms
     // after an `onTrackFinished` notification, the cued track will
     // begin playing.
-    void unpause() { sendCommand(MID_UNPAUSE); }
+    void unpause();
 
     // Set the volume to a level in the range of 0 - 30.
-    void setVolume(int volume) {
-      // Catalex effectively goes to 31, but it doesn't automatically
-      // clamp values.  DF Player Mini goes to 30 and clamps there.
-      // We'll make them behave the same way.
-      if (volume < 0) volume = 0;
-      if (30 < volume) volume = 30;
-      sendCommand(MID_SETVOLUME, static_cast<uint16_t>(volume));
-    }
+    void setVolume(int volume);
 
     // Selecting an equalizer interrupts the current playback, so it's
     // best to select the EQ before starting playback.  Alternatively,
     // you can also pause, select the new EQ, and then unpause.
-    void selectEQ(Equalizer eq) { sendCommand(MID_SELECTEQ, eq); }
+    void selectEQ(Equalizer eq);
 
     // Sleeping doesn't seem useful.  To lower the current draw, use
     // `disableDAC`.
-    void sleep() { sendCommand(MID_SLEEP); }
+    void sleep();
     
     // Seems buggy.  Try reset() or selectSource().
-    void wake() { sendCommand(MID_WAKE); }
+    void wake();
 
     // Disabling the DACs when not in use saves a few milliamps.
     // Causes a click on the output.
-    void disableDACs() { sendCommand(MID_DISABLEDAC, 1); }
+    void disableDACs();
 
     // To re-enable the DACs after they've been disabled.
     // Causes a click on the output.
-    void enableDACs() { sendCommand(MID_DISABLEDAC, 0); }
+    void enableDACs();
 
     // Ask how many audio files (total) are on a source device, including
     // the root directory and any subfolders.  This is useful for knowing
     // the upper bound on a `playFile` call.  Hook `onDeviceFileCount`
     // for the result.
-    void queryFileCount(Device device) {
-      switch (device) {
-        case DEV_USB:    sendQuery(MID_USBFILECOUNT);   break;
-        case DEV_SDCARD: sendQuery(MID_SDFILECOUNT);    break;
-        case DEV_FLASH:  sendQuery(MID_FLASHFILECOUNT); break;
-        default: break;
-      }
-    }
+    void queryFileCount(Device device);
 
-    void queryCurrentFile(Device device) {
-      switch (device) {
-        case DEV_USB:    sendQuery(MID_CURRENTUSBFILE);   break;
-        case DEV_SDCARD: sendQuery(MID_CURRENTSDFILE);    break;
-        case DEV_FLASH:  sendQuery(MID_CURRENTFLASHFILE); break;
-        default: break;
-      }
-    }
+    void queryCurrentFile(Device device);
 
     // Ask how many folders there are under the root folder on the current
     // source device.
-    void queryFolderCount() { sendQuery(MID_FOLDERCOUNT); }
+    void queryFolderCount();
 
     // Ask which device is currently selected as the source and whether
     // it's playing, paused, or stopped.  Can also indicate if the module
     // is asleep.  Hook `onStatus` for the result.  (Current device doesn't
     // seem to be reliable on DFPlayer Mini.)
-    void queryStatus() { sendQuery(MID_STATUS); }
+    void queryStatus();
 
     // Query the current volume.
     //
     // Hook `onVolume` for the result.
-    void queryVolume() { sendQuery(MID_VOLUME); }
+    void queryVolume();
 
     // Query the current equalizer setting.
     //
     // Hook `onEqualizer` for the result.
-    void queryEQ() { sendQuery(MID_EQ); }
+    void queryEQ();
 
     // Query the current playback sequence.
     //
     // Hook `onPlaybackSequence` for the result.
-    void queryPlaybackSequence() { sendQuery(MID_PLAYBACKSEQUENCE); }
+    void queryPlaybackSequence();
 
     // Query the firmware version.
     //
     // Hook `onFirmwareVersion` for the result.  Catalex doesn't respond
     // to this query, so watch for a timeout error.
-    void queryFirmwareVersion() { sendQuery(MID_FIRMWAREVERSION); }
+    void queryFirmwareVersion();
 
     static constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
       return static_cast<uint16_t>(hi << 8) | lo;
@@ -422,6 +393,7 @@ class Aidtopia_SerialAudio {
     };
 
 #if 0
+    void onAck() {}
     void onDeviceInserted(Device src) {}
     void onDeviceRemoved(Device src) {}
     void onError(uint16_t code) {}
@@ -958,13 +930,11 @@ class Aidtopia_SerialAudio {
     uint8_t  m_folders;  // the number of folders on the selected device
 };
 
-Aidtopia_SerialAudio::InitResettingHardware    Aidtopia_SerialAudio::s_init_resetting_hardware;
-Aidtopia_SerialAudio::InitGettingVersion       Aidtopia_SerialAudio::s_init_getting_version;
-Aidtopia_SerialAudio::InitCheckingUSBFileCount Aidtopia_SerialAudio::s_init_checking_usb_file_count;
-Aidtopia_SerialAudio::InitCheckingSDFileCount  Aidtopia_SerialAudio::s_init_checking_sd_file_count;
-Aidtopia_SerialAudio::InitSelectingUSB         Aidtopia_SerialAudio::s_init_selecting_usb;
-Aidtopia_SerialAudio::InitSelectingSD          Aidtopia_SerialAudio::s_init_selecting_sd;
-Aidtopia_SerialAudio::InitCheckingFolderCount  Aidtopia_SerialAudio::s_init_checking_folder_count;
-Aidtopia_SerialAudio::InitStartPlaying         Aidtopia_SerialAudio::s_init_start_playing;
+template <typename StreamType>
+void Aidtopia_SerialAudio::begin(StreamType &stream) {
+    stream.begin(9600);
+    m_stream = &stream;
+    reset();
+}
 
 #endif
