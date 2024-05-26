@@ -7,7 +7,6 @@
 #ifndef AIDTOPIASERIALAUDIO_H
 #define AIDTOPIASERIALAUDIO_H
 
-#include <Arduino.h>
 #include <utilities/timeout.h>
 
 class Aidtopia_SerialAudio {

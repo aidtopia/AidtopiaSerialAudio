@@ -4,6 +4,7 @@
 // A library that works with various serial audio modules,
 // like DFPlayer Mini, Catalex, etc.
 
+#include <Arduino.h>
 #include <AidtopiaSerialAudio.h>
 
 Aidtopia_SerialAudio::Aidtopia_SerialAudio() :
