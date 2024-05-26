@@ -7,6 +7,13 @@
 #include <Arduino.h>
 #include <AidtopiaSerialAudio.h>
 
+static constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
+  return static_cast<uint16_t>(hi << 8) | lo;
+}
+static constexpr uint8_t high(uint16_t x) { return x >> 8; }
+static constexpr uint8_t low(uint16_t x)  { return x & 0xFF; }
+
+
 Aidtopia_SerialAudio::Aidtopia_SerialAudio() :
   m_stream(nullptr), m_in(), m_out(), m_state(nullptr), m_timeout() {}
 

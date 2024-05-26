@@ -222,13 +222,6 @@ class Aidtopia_SerialAudio {
     void queryFirmwareVersion();
 
   protected:
-    static constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
-      return static_cast<uint16_t>(hi << 8) | lo;
-    }
-    
-    static constexpr uint8_t high(uint16_t x) { return x >> 8; }
-    static constexpr uint8_t low(uint16_t x)  { return x & 0xFF; }
-
     // These are the message IDs (sometimes called commands) for the
     // messages in the serial protocol for the YX5200 and YX5300 chips.
     enum MsgID : uint8_t {
