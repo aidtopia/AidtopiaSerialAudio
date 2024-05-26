@@ -1,6 +1,6 @@
 #include <AidtopiaSerialAudio.h>
 
-static Aidtopia_SerialAudio audio;
+static Aidtopia_SerialAudioWithLogging audio;
 
 void setup() {
   Serial.begin(115200);

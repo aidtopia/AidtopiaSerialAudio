@@ -335,7 +335,7 @@ class Aidtopia_SerialAudio {
         int m_length;
     };
 
-    // These hooks are called when messages are received from the audio module.
+    // Hooks
     virtual void onAck();
     virtual void onCurrentTrack(Device device, uint16_t file_index);
     virtual void onDeviceFileCount(Device device, uint16_t count);
@@ -343,19 +343,6 @@ class Aidtopia_SerialAudio {
     virtual void onDeviceRemoved(Device src);
     virtual void onEqualizer(Equalizer eq);
     virtual void onError(uint16_t code);
-
-    // Note that this hook receives a file index, even if the track
-    // was initialized using something other than its file index.
-    //
-    // The module sometimes sends these multiple times in quick
-    // succession.
-    //
-    // This hook does not trigger when the playback is stopped, only
-    // when a track finishes playing on its own.
-    //
-    // This hook does not trigger when an inserted track finishes.
-    // If you need to know that, you can try watching for a brief
-    // blink on the BUSY pin of the DF Player Mini.
     virtual void onFinishedFile(Device device, uint16_t file_index);
     virtual void onFirmwareVersion(uint16_t version);
     virtual void onFolderCount(uint16_t count);
@@ -367,11 +354,6 @@ class Aidtopia_SerialAudio {
     virtual void onPlaybackSequence(Sequence seq);
     virtual void onStatus(Device device, ModuleState state);
     virtual void onVolume(uint8_t volume);
-
-    void printDeviceName(Device src);
-    void printEqualizerName(Equalizer eq);
-    void printModuleStateName(ModuleState state);
-    void printSequenceName(Sequence seq);
 
   private:
     void checkForIncomingMessage();
@@ -491,5 +473,32 @@ void Aidtopia_SerialAudio::begin(StreamType &stream) {
     m_stream = &stream;
     reset();
 }
+
+class Aidtopia_SerialAudioWithLogging : public Aidtopia_SerialAudio {
+  protected:
+    void onAck() override;
+    void onCurrentTrack(Device device, uint16_t file_index) override;
+    void onDeviceFileCount(Device device, uint16_t count) override;
+    void onDeviceInserted(Device src) override;
+    void onDeviceRemoved(Device src) override;
+    void onEqualizer(Equalizer eq) override;
+    void onError(uint16_t code) override;
+    void onFinishedFile(Device device, uint16_t file_index) override;
+    void onFirmwareVersion(uint16_t version) override;
+    void onFolderCount(uint16_t count) override;
+    void onFolderTrackCount(uint16_t count) override;
+    void onInitComplete(uint8_t devices) override;
+    void onMessageInvalid() override;
+    void onMessageReceived(const Message &msg) override;
+    void onMessageSent(const uint8_t *buf, int len) override;
+    void onPlaybackSequence(Sequence seq) override;
+    void onStatus(Device device, ModuleState state) override;
+    void onVolume(uint8_t volume) override;
+
+    void printDeviceName(Device src);
+    void printEqualizerName(Equalizer eq);
+    void printModuleStateName(ModuleState state);
+    void printSequenceName(Sequence seq);
+};
 
 #endif

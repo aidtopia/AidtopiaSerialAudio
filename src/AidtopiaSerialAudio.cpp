@@ -249,197 +249,24 @@ uint16_t Aidtopia_SerialAudio::Message::sum() const {
   return s;
 }
 
-// HOOKS
-void Aidtopia_SerialAudio::onAck() {
-  Serial.println(F("ACK"));
-}
-
-void Aidtopia_SerialAudio::onCurrentTrack(Device device, uint16_t file_index) {
-  printDeviceName(device);
-  Serial.print(F(" current file index: "));
-  Serial.println(file_index);
-}
-
-void Aidtopia_SerialAudio::onDeviceInserted(Device src) {
-  Serial.print(F("Device inserted: "));
-  printDeviceName(src);
-  Serial.println();
-}
-
-void Aidtopia_SerialAudio::onDeviceRemoved(Device src) {
-  printDeviceName(src);
-  Serial.println(F(" removed."));
-}
-
-void Aidtopia_SerialAudio::onEqualizer(Equalizer eq) {
-  Serial.print(F("Equalizer: "));
-  printEqualizerName(eq);
-  Serial.println();
-}
-
-void Aidtopia_SerialAudio::onError(uint16_t code) {
-  Serial.print(F("Error "));
-  Serial.print(code);
-  Serial.print(F(": "));
-  switch (code) {
-    case 0x00: Serial.println(F("Unsupported command")); break;
-    case 0x01: Serial.println(F("Module busy or no sources available")); break;
-    case 0x02: Serial.println(F("Module sleeping")); break;
-    case 0x03: Serial.println(F("Serial communication error")); break;
-    case 0x04: Serial.println(F("Bad checksum")); break;
-    case 0x05: Serial.println(F("File index out of range")); break;
-    case 0x06: Serial.println(F("Track not found")); break;
-    case 0x07: Serial.println(F("Insertion error")); break;
-    case 0x08: Serial.println(F("SD card error")); break;
-    case 0x0A: Serial.println(F("Entered sleep mode")); break;
-    case 0x100: Serial.println(F("Timed out")); break;
-    default:   Serial.println(F("Unknown error code")); break;
-  }
-}
-
-void Aidtopia_SerialAudio::onDeviceFileCount(Device device, uint16_t count) {
-  printDeviceName(device);
-  Serial.print(F(" file count: "));
-  Serial.println(count);
-}
-
-// Note that this hook receives a file index, even if the track
-// was initialized using something other than its file index.
-//
-// The module sometimes sends these multiple times in quick
-// succession.
-//
-// This hook does not trigger when the playback is stopped, only
-// when a track finishes playing on its own.
-//
-// This hook does not trigger when an inserted track finishes.
-// If you need to know that, you can try watching for a brief
-// blink on the BUSY pin of the DF Player Mini.
-void Aidtopia_SerialAudio::onFinishedFile(Device device, uint16_t file_index) {
-  Serial.print(F("Finished playing file: "));
-  printDeviceName(device);
-  Serial.print(F(" "));
-  Serial.println(file_index);
-}
-
-void Aidtopia_SerialAudio::onFirmwareVersion(uint16_t version) {
-  Serial.print(F("Firmware Version: "));
-  Serial.println(version);
-}
-
-void Aidtopia_SerialAudio::onFolderCount(uint16_t count) {
-  Serial.print(F("Folder count: "));
-  Serial.println(count);
-}
-
-void Aidtopia_SerialAudio::onFolderTrackCount(uint16_t count) {
-  Serial.print(F("Folder track count: "));
-  Serial.println(count);
-}
-
-void Aidtopia_SerialAudio::onInitComplete(uint8_t devices) {
-  Serial.print(F("Hardware initialization complete.  Device(s) online:"));
-  if (devices & (1u << DEV_SDCARD)) Serial.print(F(" SD Card"));
-  if (devices & (1u << DEV_USB))    Serial.print(F(" USB"));
-  if (devices & (1u << DEV_AUX))    Serial.print(F(" AUX"));
-  if (devices & (1u << DEV_FLASH))  Serial.print(F(" Flash"));
-  Serial.println();
-}
-
-void Aidtopia_SerialAudio::onMessageInvalid() {
-  Serial.println(F("Invalid message received."));
-}
-
-void Aidtopia_SerialAudio::onMessageReceived([[maybe_unused]] const Message &msg) {
-#if 0
-  const auto *buf = msg.getBuffer();
-  const auto len = msg.getLength();
-  Serial.print(F("Received:"));
-  for (int i = 0; i < len; ++i) {
-    Serial.print(F(" "));
-    Serial.print(buf[i], HEX);
-  }
-  Serial.println();
-#endif
-}
-
-void Aidtopia_SerialAudio::onMessageSent(const uint8_t * /* buf */, int /* len */) {
-#if 0
-  Serial.print(F("Sent:    "));
-  for (int i = 0; i < len; ++i) {
-    Serial.print(F(" "));
-    Serial.print(buf[i], HEX);
-  }
-  Serial.println();
-#endif
-}
-
-void Aidtopia_SerialAudio::onPlaybackSequence(Sequence seq) {
-  Serial.print(F("Playback Sequence: "));
-  printSequenceName(seq);
-  Serial.println();
-}
-
-void Aidtopia_SerialAudio::onStatus(Device device, ModuleState state) {
-  Serial.print(F("State: "));
-  if (device != DEV_SLEEP) {
-    printDeviceName(device);
-    Serial.print(F(" "));
-  }
-  printModuleStateName(state);
-  Serial.println();
-}
-
-void Aidtopia_SerialAudio::onVolume(uint8_t volume) {
-  Serial.print(F("Volume: "));
-  Serial.println(volume);
-}
-
-void Aidtopia_SerialAudio::printDeviceName(Device src) {
-  switch (src) {
-    case DEV_USB:    Serial.print(F("USB")); break;
-    case DEV_SDCARD: Serial.print(F("SD Card")); break;
-    case DEV_AUX:    Serial.print(F("AUX")); break;
-    case DEV_SLEEP:  Serial.print(F("SLEEP (does this make sense)")); break;
-    case DEV_FLASH:  Serial.print(F("FLASH")); break;
-    default:         Serial.print(F("Unknown Device")); break;
-  }
-}
-
-void Aidtopia_SerialAudio::printEqualizerName(Equalizer eq) {
-  switch (eq) {
-    case EQ_NORMAL:    Serial.print(F("Normal"));    break;
-    case EQ_POP:       Serial.print(F("Pop"));       break;
-    case EQ_ROCK:      Serial.print(F("Rock"));      break;
-    case EQ_JAZZ:      Serial.print(F("Jazz"));      break;
-    case EQ_CLASSICAL: Serial.print(F("Classical")); break;
-    case EQ_BASS:      Serial.print(F("Bass"));      break;
-    default:           Serial.print(F("Unknown EQ")); break;
-  }
-}
-
-void Aidtopia_SerialAudio::printModuleStateName(ModuleState state) {
-  switch (state) {
-    case MS_STOPPED: Serial.print(F("Stopped")); break;
-    case MS_PLAYING: Serial.print(F("Playing")); break;
-    case MS_PAUSED:  Serial.print(F("Paused"));  break;
-    case MS_ASLEEP:  Serial.print(F("Asleep"));  break;
-    default:         Serial.print(F("???"));     break;
-  }
-}
-
-void Aidtopia_SerialAudio::printSequenceName(Sequence seq) {
-  switch (seq) {
-    case SEQ_LOOPALL:    Serial.print(F("Loop All")); break;
-    case SEQ_LOOPFOLDER: Serial.print(F("Loop Folder")); break;
-    case SEQ_LOOPTRACK:  Serial.print(F("Loop Track")); break;
-    case SEQ_RANDOM:     Serial.print(F("Random")); break;
-    case SEQ_SINGLE:     Serial.print(F("Single")); break;
-    default:             Serial.print(F("???")); break;
-  }
-}
-// END OF HOOKS
-
+void Aidtopia_SerialAudio::onAck() {};
+void Aidtopia_SerialAudio::onCurrentTrack(Device /*device*/, uint16_t /*file_index*/) {};
+void Aidtopia_SerialAudio::onDeviceFileCount(Device /*device*/, uint16_t /*count*/) {};
+void Aidtopia_SerialAudio::onDeviceInserted(Device /*src*/) {};
+void Aidtopia_SerialAudio::onDeviceRemoved(Device /*src*/) {};
+void Aidtopia_SerialAudio::onEqualizer(Equalizer /*eq*/) {};
+void Aidtopia_SerialAudio::onError(uint16_t /*code*/) {};
+void Aidtopia_SerialAudio::onFinishedFile(Device /*device*/, uint16_t /*file_index*/) {};
+void Aidtopia_SerialAudio::onFirmwareVersion(uint16_t /*version*/) {};
+void Aidtopia_SerialAudio::onFolderCount(uint16_t /*count*/) {};
+void Aidtopia_SerialAudio::onFolderTrackCount(uint16_t /*count*/) {};
+void Aidtopia_SerialAudio::onInitComplete(uint8_t /*devices*/) {};
+void Aidtopia_SerialAudio::onMessageInvalid() {};
+void Aidtopia_SerialAudio::onMessageReceived(const Message &/*msg*/) {};
+void Aidtopia_SerialAudio::onMessageSent(const uint8_t */*buf*/, int /*len*/) {};
+void Aidtopia_SerialAudio::onPlaybackSequence(Sequence /*seq*/) {};
+void Aidtopia_SerialAudio::onStatus(Device /*device*/, ModuleState /*state*/) {};
+void Aidtopia_SerialAudio::onVolume(uint8_t /*volume*/) {};
 
 void Aidtopia_SerialAudio::checkForIncomingMessage() {
   while (m_stream->available() > 0) {
@@ -579,12 +406,10 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::State::onEvent(
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitResettingHardware::onEvent(
   Aidtopia_SerialAudio *module,
   MsgID msgid,
-  uint8_t paramHi,
-  uint8_t paramLo
+  uint8_t /*paramHi*/, uint8_t /*paramLo*/
 ) {
   switch (msgid) {
     case MID_ENTERSTATE:
-      Serial.println(F("Resetting hardware."));
       module->sendCommand(MID_RESET, 0, false);
       // The default timeout is probably too short for a reset.
       module->m_timeout.set(10000);
@@ -592,9 +417,6 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitResettingHardware::onEven
     case MID_INITCOMPLETE:
       return &Aidtopia_SerialAudio::s_init_getting_version;
     case MID_ERROR:
-      if (combine(paramHi, paramLo) == EC_TIMEDOUT) {
-        Serial.println(F("No response from audio module"));
-      }
       return nullptr;
     default: break;
   }
@@ -719,13 +541,6 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingFolderCount::onEv
       return this;
     case MID_FOLDERCOUNT:
       module->m_folders = paramLo;
-      Serial.print(F("Audio module initialized.\nSelected: "));
-      module->printDeviceName(module->m_source);
-      Serial.print(F(" with "));
-      Serial.print(module->m_files);
-      Serial.print(F(" files and "));
-      Serial.print(module->m_folders);
-      Serial.println(F(" folders"));
       return nullptr;
     default: break;
   }
@@ -748,4 +563,189 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitStartPlaying::onEvent(
   }
   return this;
 }
-Aidtopia_SerialAudio::InitStartPlaying         Aidtopia_SerialAudio::s_init_start_playing;
+Aidtopia_SerialAudio::InitStartPlaying Aidtopia_SerialAudio::s_init_start_playing;
+
+
+void Aidtopia_SerialAudioWithLogging::onAck() {
+  Serial.println(F("ACK"));
+}
+
+void Aidtopia_SerialAudioWithLogging::onCurrentTrack(Device device, uint16_t file_index) {
+  printDeviceName(device);
+  Serial.print(F(" current file index: "));
+  Serial.println(file_index);
+}
+
+void Aidtopia_SerialAudioWithLogging::onDeviceInserted(Device src) {
+  Serial.print(F("Device inserted: "));
+  printDeviceName(src);
+  Serial.println();
+}
+
+void Aidtopia_SerialAudioWithLogging::onDeviceRemoved(Device src) {
+  printDeviceName(src);
+  Serial.println(F(" removed."));
+}
+
+void Aidtopia_SerialAudioWithLogging::onEqualizer(Equalizer eq) {
+  Serial.print(F("Equalizer: "));
+  printEqualizerName(eq);
+  Serial.println();
+}
+
+void Aidtopia_SerialAudioWithLogging::onError(uint16_t code) {
+  Serial.print(F("Error "));
+  Serial.print(code);
+  Serial.print(F(": "));
+  switch (code) {
+    case 0x00: Serial.println(F("Unsupported command")); break;
+    case 0x01: Serial.println(F("Module busy or no sources available")); break;
+    case 0x02: Serial.println(F("Module sleeping")); break;
+    case 0x03: Serial.println(F("Serial communication error")); break;
+    case 0x04: Serial.println(F("Bad checksum")); break;
+    case 0x05: Serial.println(F("File index out of range")); break;
+    case 0x06: Serial.println(F("Track not found")); break;
+    case 0x07: Serial.println(F("Insertion error")); break;
+    case 0x08: Serial.println(F("SD card error")); break;
+    case 0x0A: Serial.println(F("Entered sleep mode")); break;
+    case 0x100: Serial.println(F("Timed out")); break;
+    default:   Serial.println(F("Unknown error code")); break;
+  }
+}
+
+void Aidtopia_SerialAudioWithLogging::onDeviceFileCount(Device device, uint16_t count) {
+  printDeviceName(device);
+  Serial.print(F(" file count: "));
+  Serial.println(count);
+}
+
+// Note that this hook receives a file index, even if the track was selected
+// with a track number.
+//
+// The module sometimes sends these multiple times in quick succession.
+//
+// This hook does not trigger when the playback is stopped, only when a track
+// finishes playing on its own.
+//
+// This hook does not trigger when an inserted ("advertisement") track finishes.
+// If you need to know that, you can try watching for a brief blink on the BUSY
+// pin of the DFPlayer Mini.
+void Aidtopia_SerialAudioWithLogging::onFinishedFile(Device device, uint16_t file_index) {
+  Serial.print(F("Finished playing file: "));
+  printDeviceName(device);
+  Serial.print(F(" "));
+  Serial.println(file_index);
+}
+
+void Aidtopia_SerialAudioWithLogging::onFirmwareVersion(uint16_t version) {
+  Serial.print(F("Firmware Version: "));
+  Serial.println(version);
+}
+
+void Aidtopia_SerialAudioWithLogging::onFolderCount(uint16_t count) {
+  Serial.print(F("Folder count: "));
+  Serial.println(count);
+}
+
+void Aidtopia_SerialAudioWithLogging::onFolderTrackCount(uint16_t count) {
+  Serial.print(F("Folder track count: "));
+  Serial.println(count);
+}
+
+void Aidtopia_SerialAudioWithLogging::onInitComplete(uint8_t devices) {
+  Serial.print(F("Audio module initialized.  Device(s) online:"));
+  if (devices & (1u << DEV_SDCARD)) Serial.print(F(" SD Card"));
+  if (devices & (1u << DEV_USB))    Serial.print(F(" USB"));
+  if (devices & (1u << DEV_AUX))    Serial.print(F(" AUX"));
+  if (devices & (1u << DEV_FLASH))  Serial.print(F(" Flash"));
+  Serial.println();
+}
+
+void Aidtopia_SerialAudioWithLogging::onMessageInvalid() {
+  Serial.println(F("Invalid message received."));
+}
+
+void Aidtopia_SerialAudioWithLogging::onMessageReceived([[maybe_unused]] const Message &msg) {
+  const auto *buf = msg.getBuffer();
+  const auto len = msg.getLength();
+  Serial.print(F("Received:"));
+  for (int i = 0; i < len; ++i) {
+    Serial.print(F(" "));
+    Serial.print(buf[i], HEX);
+  }
+  Serial.println();
+}
+
+void Aidtopia_SerialAudioWithLogging::onMessageSent(const uint8_t *buf, int len) {
+  Serial.print(F("Sent:    "));
+  for (int i = 0; i < len; ++i) {
+    Serial.print(F(" "));
+    Serial.print(buf[i], HEX);
+  }
+  Serial.println();
+}
+
+void Aidtopia_SerialAudioWithLogging::onPlaybackSequence(Sequence seq) {
+  Serial.print(F("Playback Sequence: "));
+  printSequenceName(seq);
+  Serial.println();
+}
+
+void Aidtopia_SerialAudioWithLogging::onStatus(Device device, ModuleState state) {
+  Serial.print(F("State: "));
+  if (device != DEV_SLEEP) {
+    printDeviceName(device);
+    Serial.print(F(" "));
+  }
+  printModuleStateName(state);
+  Serial.println();
+}
+
+void Aidtopia_SerialAudioWithLogging::onVolume(uint8_t volume) {
+  Serial.print(F("Volume: "));
+  Serial.println(volume);
+}
+
+void Aidtopia_SerialAudioWithLogging::printDeviceName(Device src) {
+  switch (src) {
+    case DEV_USB:    Serial.print(F("USB")); break;
+    case DEV_SDCARD: Serial.print(F("SD Card")); break;
+    case DEV_AUX:    Serial.print(F("AUX")); break;
+    case DEV_SLEEP:  Serial.print(F("SLEEP (does this make sense)")); break;
+    case DEV_FLASH:  Serial.print(F("FLASH")); break;
+    default:         Serial.print(F("Unknown Device")); break;
+  }
+}
+
+void Aidtopia_SerialAudioWithLogging::printEqualizerName(Equalizer eq) {
+  switch (eq) {
+    case EQ_NORMAL:    Serial.print(F("Normal"));    break;
+    case EQ_POP:       Serial.print(F("Pop"));       break;
+    case EQ_ROCK:      Serial.print(F("Rock"));      break;
+    case EQ_JAZZ:      Serial.print(F("Jazz"));      break;
+    case EQ_CLASSICAL: Serial.print(F("Classical")); break;
+    case EQ_BASS:      Serial.print(F("Bass"));      break;
+    default:           Serial.print(F("Unknown EQ")); break;
+  }
+}
+
+void Aidtopia_SerialAudioWithLogging::printModuleStateName(ModuleState state) {
+  switch (state) {
+    case MS_STOPPED: Serial.print(F("Stopped")); break;
+    case MS_PLAYING: Serial.print(F("Playing")); break;
+    case MS_PAUSED:  Serial.print(F("Paused"));  break;
+    case MS_ASLEEP:  Serial.print(F("Asleep"));  break;
+    default:         Serial.print(F("???"));     break;
+  }
+}
+
+void Aidtopia_SerialAudioWithLogging::printSequenceName(Sequence seq) {
+  switch (seq) {
+    case SEQ_LOOPALL:    Serial.print(F("Loop All")); break;
+    case SEQ_LOOPFOLDER: Serial.print(F("Loop Folder")); break;
+    case SEQ_LOOPTRACK:  Serial.print(F("Loop Track")); break;
+    case SEQ_RANDOM:     Serial.print(F("Random")); break;
+    case SEQ_SINGLE:     Serial.print(F("Single")); break;
+    default:             Serial.print(F("???")); break;
+  }
+}
