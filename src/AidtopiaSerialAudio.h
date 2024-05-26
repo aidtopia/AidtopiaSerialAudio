@@ -161,6 +161,8 @@ class Aidtopia_SerialAudio {
 
     // Set the volume to a level in the range of 0 - 30.
     void setVolume(int volume);
+    void increaseVolume();
+    void decreaseVolume();
 
     // Selecting an equalizer interrupts the current playback, so it's
     // best to select the EQ before starting playback.  Alternatively,

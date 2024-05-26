@@ -107,6 +107,9 @@ void Aidtopia_SerialAudio::setVolume(int volume) {
   sendCommand(MID_SETVOLUME, static_cast<uint16_t>(volume));
 }
 
+void Aidtopia_SerialAudio::increaseVolume() { sendCommand(MID_VOLUMEUP); }
+void Aidtopia_SerialAudio::decreaseVolume() { sendCommand(MID_VOLUMEDOWN); }
+
 void Aidtopia_SerialAudio::selectEQ(Equalizer eq) {
   sendCommand(MID_SELECTEQ, eq);
 }
