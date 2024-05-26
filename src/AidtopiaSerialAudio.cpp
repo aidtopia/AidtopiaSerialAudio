@@ -267,10 +267,82 @@ void Aidtopia_SerialAudio::checkForTimeout() {
 }
 
 void Aidtopia_SerialAudio::receiveMessage(const Message &msg) {
-  onMessageReceived(msg);
-  if (!msg.isValid()) return onMessageInvalid();
+  callHooks(msg);
   if (!m_state) return;
   setState(m_state->onEvent(this, msg.getMessageID(), msg.getParamHi(), msg.getParamLo()));
+}
+
+void Aidtopia_SerialAudio::callHooks(const Message &msg) {
+  onMessageReceived(msg);
+  if (!msg.isValid()) return onMessageInvalid();
+
+  switch (msg.getMessageID()) {
+    case 0x3A: {
+      const auto mask = msg.getParamLo();
+      if (mask & 0x01) onDeviceInserted(DEV_USB);
+      if (mask & 0x02) onDeviceInserted(DEV_SDCARD);
+      if (mask & 0x04) onDeviceInserted(DEV_AUX);
+      return;
+    }
+    case 0x3B: {
+      const auto mask = msg.getParamLo();
+      if (mask & 0x01) onDeviceRemoved(DEV_USB);
+      if (mask & 0x02) onDeviceRemoved(DEV_SDCARD);
+      if (mask & 0x04) onDeviceRemoved(DEV_AUX);
+      return;
+    }
+    case 0x3C: return onFinishedFile(DEV_USB, msg.getParam());
+    case 0x3D: return onFinishedFile(DEV_SDCARD, msg.getParam());
+    case 0x3E: return onFinishedFile(DEV_FLASH, msg.getParam());
+
+    // Initialization complete
+    case 0x3F: {
+      uint16_t devices = 0;
+      const auto mask = msg.getParamLo();
+      if (mask & 0x01) devices = devices | (1u << DEV_USB);
+      if (mask & 0x02) devices = devices | (1u << DEV_SDCARD);
+      if (mask & 0x04) devices = devices | (1u << DEV_AUX);
+      if (mask & 0x10) devices = devices | (1u << DEV_FLASH);
+      return onInitComplete(devices);
+    }
+
+    case 0x40: return onError(msg.getParamLo());
+    case 0x41: return onAck();
+
+    // Query responses
+    case 0x42: {
+      // Only Flyron documents this response to the status query.
+      // The DFPlayer Mini always seems to report SDCARD even when
+      // the selected and active device is USB, so maybe it uses
+      // the high byte to signal something else?  Catalex also
+      // always reports the SDCARD, but it only has an SDCARD.
+      Device device = DEV_SLEEP;
+      switch (msg.getParamHi()) {
+        case 0x01: device = DEV_USB;     break;
+        case 0x02: device = DEV_SDCARD;  break;
+      }
+      ModuleState state = MS_ASLEEP;
+      switch (msg.getParamLo()) {
+        case 0x00: state = MS_STOPPED;  break;
+        case 0x01: state = MS_PLAYING;  break;
+        case 0x02: state = MS_PAUSED;   break;
+      }
+      return onStatus(device, state);
+    }
+    case 0x43: return onVolume(msg.getParamLo());
+    case 0x44: return onEqualizer(static_cast<Equalizer>(msg.getParamLo()));
+    case 0x45: return onPlaybackSequence(static_cast<Sequence>(msg.getParamLo()));
+    case 0x46: return onFirmwareVersion(msg.getParam());
+    case 0x47: return onDeviceFileCount(DEV_USB, msg.getParam());
+    case 0x48: return onDeviceFileCount(DEV_SDCARD, msg.getParam());
+    case 0x49: return onDeviceFileCount(DEV_FLASH, msg.getParam());
+    case 0x4B: return onCurrentTrack(DEV_USB, msg.getParam());
+    case 0x4C: return onCurrentTrack(DEV_SDCARD, msg.getParam());
+    case 0x4D: return onCurrentTrack(DEV_FLASH, msg.getParam());
+    case 0x4E: return onFolderTrackCount(msg.getParam());
+    case 0x4F: return onFolderCount(msg.getParam());
+    default: break;
+  }
 }
 
 void Aidtopia_SerialAudio::sendMessage(const Message &msg) {
