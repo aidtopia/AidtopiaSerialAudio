@@ -321,72 +321,24 @@ class Aidtopia_SerialAudio {
         enum { START = 0x7E, VERSION = 0xFF, LENGTH = 6, END = 0xEF };
         enum Feedback { NO_FEEDBACK = 0x00, FEEDBACK = 0x01 };
 
-        Message() :
-          m_buf{START, VERSION, LENGTH, 0, FEEDBACK, 0, 0, 0, 0, END},
-          m_length(0) {}
+        Message();
 
-        void set(MsgID msgid, uint16_t param, Feedback feedback = NO_FEEDBACK) {
-          // Note that we're filling in just the bytes that change.  We rely
-          // on the framing bytes set when the buffer was first initialized.
-          m_buf[3] = msgid;
-          m_buf[4] = feedback;
-          m_buf[5] = (param >> 8) & 0xFF;
-          m_buf[6] = (param     ) & 0xFF;
-          const uint16_t checksum = ~sum() + 1;
-          m_buf[7] = (checksum >> 8) & 0xFF;
-          m_buf[8] = (checksum     ) & 0xFF;
-          m_length = 10;
-        }
+        void set(MsgID msgid, uint16_t param, Feedback feedback = NO_FEEDBACK);
 
-        const uint8_t *getBuffer() const { return m_buf; }
-        int getLength() const { return m_length; }
-
-        bool isValid() const {
-          if (m_length == 8 && m_buf[7] == END) return true;
-          if (m_length != 10) return false;
-          const uint16_t checksum = combine(m_buf[7], m_buf[8]);
-          return sum() + checksum == 0;
-        }
-
-        MsgID getMessageID() const { return static_cast<MsgID>(m_buf[3]); }
-        uint8_t getParamHi() const { return m_buf[5]; }
-        uint8_t getParamLo() const { return m_buf[6]; }
-        uint16_t getParam() const { return combine(m_buf[5], m_buf[6]); }
+        const uint8_t *getBuffer() const;
+        int getLength() const;
+        bool isValid() const;
+        MsgID getMessageID() const;
+        uint8_t getParamHi() const;
+        uint8_t getParamLo() const;
+        uint16_t getParam() const;
 
         // Returns true if the byte `b` completes a message.
-        bool receive(uint8_t b) {
-          switch (m_length) {
-            default:
-              // `m_length` is out of bounds, so start fresh.
-              m_length = 0;
-              /* FALLTHROUGH */
-            case 0: case 1: case 2: case 9:
-              // These bytes must always match the template.
-              if (b == m_buf[m_length]) { ++m_length; return m_length == 10; }
-              // No match; try to resync.
-              if (b == START) { m_length = 1; return false; }
-              m_length = 0;
-              return false;
-            case 7:
-              // If there's no checksum, the message may end here.
-              if (b == END) { m_length = 8; return true; }
-              /* FALLTHROUGH */
-            case 3: case 4: case 5: case 6: case 8:
-              // These are the payload bytes we care about.
-              m_buf[m_length++] = b;
-              return false;
-          }
-        }
-
+        bool receive(uint8_t b);
+        
       private:
         // Sums the bytes used to compute the Message's checksum.
-        uint16_t sum() const {
-          uint16_t s = 0;
-          for (int i = 1; i <= LENGTH; ++i) {
-            s += m_buf[i];
-          }
-          return s;
-        }
+        uint16_t sum() const;
 
         uint8_t m_buf[10];
         int m_length;
@@ -680,6 +632,61 @@ class Aidtopia_SerialAudio {
         );
     };
 
+    void checkForIncomingMessage() {
+      while (m_stream->available() > 0) {
+        if (m_in.receive(m_stream->read())) {
+          receiveMessage(m_in);
+        }
+      }
+    }
+
+    void checkForTimeout() {
+      if (m_timeout.expired()) {
+        m_timeout.cancel();
+        if (m_state) {
+          setState(m_state->onEvent(this, MID_ERROR, high(EC_TIMEDOUT), low(EC_TIMEDOUT)));
+        }
+      }
+    }
+
+    void receiveMessage(const Message &msg) {
+      onMessageReceived(msg);
+      if (!msg.isValid()) return onMessageInvalid();
+      if (!m_state) return;
+      setState(m_state->onEvent(this, msg.getMessageID(), msg.getParamHi(), msg.getParamLo()));
+    }
+
+    void sendMessage(const Message &msg) {
+      const auto buf = msg.getBuffer();
+      const auto len = msg.getLength();
+      m_stream->write(buf, len);
+      m_timeout.set(200);
+      onMessageSent(buf, len);
+    }
+
+    void sendCommand(MsgID msgid, uint16_t param = 0, bool feedback = true) {
+      m_out.set(msgid, param, feedback ? Message::FEEDBACK : Message::NO_FEEDBACK);
+      sendMessage(m_out);
+    }
+
+    void sendQuery(MsgID msgid, uint16_t param = 0) {
+      // Since queries naturally have a response, we won't ask for feedback.
+      sendCommand(msgid, param, false);
+    }
+
+    void setState(State *new_state, uint8_t arg1 = 0, uint8_t arg2 = 0) {
+      const auto original_state = m_state;
+      while (m_state != new_state) {
+        m_state = new_state;
+        if (m_state) {
+          new_state = m_state->onEvent(this, MID_ENTERSTATE, arg1, arg2);
+        }
+        // break out of a cycle
+        if (m_state == original_state) return;
+      }
+    }
+
+    // Derived States
     struct InitResettingHardware : public State {
       State *onEvent(
         Aidtopia_SerialAudio *module,
@@ -751,60 +758,6 @@ class Aidtopia_SerialAudio {
       ) override;
     };
     static InitStartPlaying s_init_start_playing;
-
-    void checkForIncomingMessage() {
-      while (m_stream->available() > 0) {
-        if (m_in.receive(m_stream->read())) {
-          receiveMessage(m_in);
-        }
-      }
-    }
-
-    void checkForTimeout() {
-      if (m_timeout.expired()) {
-        m_timeout.cancel();
-        if (m_state) {
-          setState(m_state->onEvent(this, MID_ERROR, high(EC_TIMEDOUT), low(EC_TIMEDOUT)));
-        }
-      }
-    }
-
-    void receiveMessage(const Message &msg) {
-      onMessageReceived(msg);
-      if (!msg.isValid()) return onMessageInvalid();
-      if (!m_state) return;
-      setState(m_state->onEvent(this, msg.getMessageID(), msg.getParamHi(), msg.getParamLo()));
-    }
-
-    void sendMessage(const Message &msg) {
-      const auto buf = msg.getBuffer();
-      const auto len = msg.getLength();
-      m_stream->write(buf, len);
-      m_timeout.set(200);
-      onMessageSent(buf, len);
-    }
-
-    void sendCommand(MsgID msgid, uint16_t param = 0, bool feedback = true) {
-      m_out.set(msgid, param, feedback ? Message::FEEDBACK : Message::NO_FEEDBACK);
-      sendMessage(m_out);
-    }
-
-    void sendQuery(MsgID msgid, uint16_t param = 0) {
-      // Since queries naturally have a response, we won't ask for feedback.
-      sendCommand(msgid, param, false);
-    }
-
-    void setState(State *new_state, uint8_t arg1 = 0, uint8_t arg2 = 0) {
-      const auto original_state = m_state;
-      while (m_state != new_state) {
-        m_state = new_state;
-        if (m_state) {
-          new_state = m_state->onEvent(this, MID_ENTERSTATE, arg1, arg2);
-        }
-        // break out of a cycle
-        if (m_state == original_state) return;
-      }
-    }
 
     // TODO:  Guess the module type.
     enum Module { MOD_UNKNOWN, MOD_CATALEX, MOD_DFPLAYERMINI };

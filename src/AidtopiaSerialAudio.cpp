@@ -162,6 +162,88 @@ void Aidtopia_SerialAudio::queryFirmwareVersion() {
 }
 
 
+
+Aidtopia_SerialAudio::Message::Message() :
+  m_buf{START, VERSION, LENGTH, 0, FEEDBACK, 0, 0, 0, 0, END},
+  m_length(0) {}
+
+void Aidtopia_SerialAudio::Message::set(
+    MsgID msgid, uint16_t param, Feedback feedback
+) {
+  // Note that we're filling in just the bytes that change.  We rely
+  // on the framing bytes set when the buffer was first initialized.
+  m_buf[3] = msgid;
+  m_buf[4] = feedback;
+  m_buf[5] = (param >> 8) & 0xFF;
+  m_buf[6] = (param     ) & 0xFF;
+  const uint16_t checksum = ~sum() + 1;
+  m_buf[7] = (checksum >> 8) & 0xFF;
+  m_buf[8] = (checksum     ) & 0xFF;
+  m_length = 10;
+}
+
+const uint8_t *Aidtopia_SerialAudio::Message::getBuffer() const {
+  return m_buf;
+}
+
+int Aidtopia_SerialAudio::Message::getLength() const {
+  return m_length;
+}
+
+bool Aidtopia_SerialAudio::Message::isValid() const {
+  if (m_length == 8 && m_buf[7] == END) return true;
+  if (m_length != 10) return false;
+  const uint16_t checksum = combine(m_buf[7], m_buf[8]);
+  return sum() + checksum == 0;
+}
+
+Aidtopia_SerialAudio::MsgID Aidtopia_SerialAudio::Message::getMessageID() const {
+  return static_cast<MsgID>(m_buf[3]);
+}
+
+uint8_t Aidtopia_SerialAudio::Message::getParamHi() const { return m_buf[5]; }
+
+uint8_t Aidtopia_SerialAudio::Message::getParamLo() const { return m_buf[6]; }
+
+uint16_t Aidtopia_SerialAudio::Message::getParam() const {
+  return combine(m_buf[5], m_buf[6]);
+}
+
+bool Aidtopia_SerialAudio::Message::receive(uint8_t b) {
+  switch (m_length) {
+    default:
+      // `m_length` is out of bounds, so start fresh.
+      m_length = 0;
+      /* FALLTHROUGH */
+    case 0: case 1: case 2: case 9:
+      // These bytes must always match the template.
+      if (b == m_buf[m_length]) { ++m_length; return m_length == 10; }
+      // No match; try to resync.
+      if (b == START) { m_length = 1; return false; }
+      m_length = 0;
+      return false;
+    case 7:
+      // If there's no checksum, the message may end here.
+      if (b == END) { m_length = 8; return true; }
+      /* FALLTHROUGH */
+    case 3: case 4: case 5: case 6: case 8:
+      // These are the payload bytes we care about.
+      m_buf[m_length++] = b;
+      return false;
+  }
+}
+
+uint16_t Aidtopia_SerialAudio::Message::sum() const {
+  uint16_t s = 0;
+  for (int i = 1; i <= LENGTH; ++i) {
+    s += m_buf[i];
+  }
+  return s;
+}
+
+
+
+
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::State::onEvent(
   Aidtopia_SerialAudio * /*module*/,
   MsgID /*msgid*/,
@@ -170,7 +252,6 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::State::onEvent(
 ) {
   return this;
 }
-
 
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitResettingHardware::onEvent(
   Aidtopia_SerialAudio *module,
@@ -196,6 +277,8 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitResettingHardware::onEven
   }
   return this;
 }
+Aidtopia_SerialAudio::InitResettingHardware Aidtopia_SerialAudio::s_init_resetting_hardware;
+
 
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitGettingVersion::onEvent(
     Aidtopia_SerialAudio *module,
@@ -218,6 +301,7 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitGettingVersion::onEvent(
   }
   return this;
 }
+Aidtopia_SerialAudio::InitGettingVersion Aidtopia_SerialAudio::s_init_getting_version;
 
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingUSBFileCount::onEvent(
   Aidtopia_SerialAudio *module,
@@ -240,6 +324,7 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingUSBFileCount::onE
   }
   return this;
 }
+Aidtopia_SerialAudio::InitCheckingUSBFileCount Aidtopia_SerialAudio::s_init_checking_usb_file_count;
 
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingSDFileCount::onEvent(
   Aidtopia_SerialAudio *module,
@@ -262,6 +347,7 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingSDFileCount::onEv
   }
   return this;
 }
+Aidtopia_SerialAudio::InitCheckingSDFileCount Aidtopia_SerialAudio::s_init_checking_sd_file_count;
 
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitSelectingUSB::onEvent(
   Aidtopia_SerialAudio *module,
@@ -279,6 +365,7 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitSelectingUSB::onEvent(
   }
   return this;
 }
+Aidtopia_SerialAudio::InitSelectingUSB Aidtopia_SerialAudio::s_init_selecting_usb;
 
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitSelectingSD::onEvent(
   Aidtopia_SerialAudio *module,
@@ -296,6 +383,7 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitSelectingSD::onEvent(
   }
   return this;
 }
+Aidtopia_SerialAudio::InitSelectingSD Aidtopia_SerialAudio::s_init_selecting_sd;
 
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingFolderCount::onEvent(
   Aidtopia_SerialAudio *module,
@@ -320,6 +408,7 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingFolderCount::onEv
   }
   return this;
 }
+Aidtopia_SerialAudio::InitCheckingFolderCount  Aidtopia_SerialAudio::s_init_checking_folder_count;
 
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitStartPlaying::onEvent(
   Aidtopia_SerialAudio *module,
@@ -336,14 +425,4 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitStartPlaying::onEvent(
   }
   return this;
 }
-
-
-
-Aidtopia_SerialAudio::InitResettingHardware    Aidtopia_SerialAudio::s_init_resetting_hardware;
-Aidtopia_SerialAudio::InitGettingVersion       Aidtopia_SerialAudio::s_init_getting_version;
-Aidtopia_SerialAudio::InitCheckingUSBFileCount Aidtopia_SerialAudio::s_init_checking_usb_file_count;
-Aidtopia_SerialAudio::InitCheckingSDFileCount  Aidtopia_SerialAudio::s_init_checking_sd_file_count;
-Aidtopia_SerialAudio::InitSelectingUSB         Aidtopia_SerialAudio::s_init_selecting_usb;
-Aidtopia_SerialAudio::InitSelectingSD          Aidtopia_SerialAudio::s_init_selecting_sd;
-Aidtopia_SerialAudio::InitCheckingFolderCount  Aidtopia_SerialAudio::s_init_checking_folder_count;
 Aidtopia_SerialAudio::InitStartPlaying         Aidtopia_SerialAudio::s_init_start_playing;
