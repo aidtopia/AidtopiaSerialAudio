@@ -241,8 +241,59 @@ uint16_t Aidtopia_SerialAudio::Message::sum() const {
   return s;
 }
 
+void Aidtopia_SerialAudio::checkForIncomingMessage() {
+  while (m_stream->available() > 0) {
+    if (m_in.receive(m_stream->read())) {
+      receiveMessage(m_in);
+    }
+  }
+}
 
+void Aidtopia_SerialAudio::checkForTimeout() {
+  if (m_timeout.expired()) {
+    m_timeout.cancel();
+    if (m_state) {
+      setState(m_state->onEvent(this, MID_ERROR, high(EC_TIMEDOUT), low(EC_TIMEDOUT)));
+    }
+  }
+}
 
+void Aidtopia_SerialAudio::receiveMessage(const Message &msg) {
+  onMessageReceived(msg);
+  if (!msg.isValid()) return onMessageInvalid();
+  if (!m_state) return;
+  setState(m_state->onEvent(this, msg.getMessageID(), msg.getParamHi(), msg.getParamLo()));
+}
+
+void Aidtopia_SerialAudio::sendMessage(const Message &msg) {
+  const auto buf = msg.getBuffer();
+  const auto len = msg.getLength();
+  m_stream->write(buf, len);
+  m_timeout.set(200);
+  onMessageSent(buf, len);
+}
+
+void Aidtopia_SerialAudio::sendCommand(MsgID msgid, uint16_t param, bool feedback) {
+  m_out.set(msgid, param, feedback ? Message::FEEDBACK : Message::NO_FEEDBACK);
+  sendMessage(m_out);
+}
+
+void Aidtopia_SerialAudio::sendQuery(MsgID msgid, uint16_t param) {
+  // Since queries naturally have a response, we won't ask for feedback.
+  sendCommand(msgid, param, false);
+}
+
+void Aidtopia_SerialAudio::setState(State *new_state, uint8_t arg1, uint8_t arg2) {
+  const auto original_state = m_state;
+  while (m_state != new_state) {
+    m_state = new_state;
+    if (m_state) {
+      new_state = m_state->onEvent(this, MID_ENTERSTATE, arg1, arg2);
+    }
+    // break out of a cycle
+    if (m_state == original_state) return;
+  }
+}
 
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::State::onEvent(
   Aidtopia_SerialAudio * /*module*/,

@@ -616,9 +616,19 @@ class Aidtopia_SerialAudio {
 #endif
 
   private:
-    // The State tells us how to handle messages received from the module.
-    // The intent is to have one static instance of each concrete State in
-    // order to minimize RAM and ROM usage.
+    void checkForIncomingMessage();
+
+    void checkForTimeout();
+
+    void receiveMessage(const Message &msg);
+
+    void sendMessage(const Message &msg);
+
+    void sendCommand(MsgID msgid, uint16_t param = 0, bool feedback = true);
+
+    void sendQuery(MsgID msgid, uint16_t param = 0);
+
+    // A State tells us how to handle messages received from the module.
     struct State {
         // The return value is a pointer to the new State.  You can return
         // `this` to remain in the same State, `nullptr` to indicate that
@@ -632,61 +642,10 @@ class Aidtopia_SerialAudio {
         );
     };
 
-    void checkForIncomingMessage() {
-      while (m_stream->available() > 0) {
-        if (m_in.receive(m_stream->read())) {
-          receiveMessage(m_in);
-        }
-      }
-    }
+    void setState(State *new_state, uint8_t arg1 = 0, uint8_t arg2 = 0);
 
-    void checkForTimeout() {
-      if (m_timeout.expired()) {
-        m_timeout.cancel();
-        if (m_state) {
-          setState(m_state->onEvent(this, MID_ERROR, high(EC_TIMEDOUT), low(EC_TIMEDOUT)));
-        }
-      }
-    }
-
-    void receiveMessage(const Message &msg) {
-      onMessageReceived(msg);
-      if (!msg.isValid()) return onMessageInvalid();
-      if (!m_state) return;
-      setState(m_state->onEvent(this, msg.getMessageID(), msg.getParamHi(), msg.getParamLo()));
-    }
-
-    void sendMessage(const Message &msg) {
-      const auto buf = msg.getBuffer();
-      const auto len = msg.getLength();
-      m_stream->write(buf, len);
-      m_timeout.set(200);
-      onMessageSent(buf, len);
-    }
-
-    void sendCommand(MsgID msgid, uint16_t param = 0, bool feedback = true) {
-      m_out.set(msgid, param, feedback ? Message::FEEDBACK : Message::NO_FEEDBACK);
-      sendMessage(m_out);
-    }
-
-    void sendQuery(MsgID msgid, uint16_t param = 0) {
-      // Since queries naturally have a response, we won't ask for feedback.
-      sendCommand(msgid, param, false);
-    }
-
-    void setState(State *new_state, uint8_t arg1 = 0, uint8_t arg2 = 0) {
-      const auto original_state = m_state;
-      while (m_state != new_state) {
-        m_state = new_state;
-        if (m_state) {
-          new_state = m_state->onEvent(this, MID_ENTERSTATE, arg1, arg2);
-        }
-        // break out of a cycle
-        if (m_state == original_state) return;
-      }
-    }
-
-    // Derived States
+    // The intent is to have one static instance of each concrete State in
+    // order to minimize RAM and ROM usage.
     struct InitResettingHardware : public State {
       State *onEvent(
         Aidtopia_SerialAudio *module,
