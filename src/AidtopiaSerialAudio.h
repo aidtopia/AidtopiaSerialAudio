@@ -462,9 +462,6 @@ class Aidtopia_SerialAudio {
     Message  m_out;
     State   *m_state;
     Timeout<MillisClock> m_timeout;
-    Device   m_source;   // the currently selected device
-    uint16_t m_files;    // the number of files on the selected device
-    uint8_t  m_folders;  // the number of folders on the selected device
 };
 
 template <typename StreamType>

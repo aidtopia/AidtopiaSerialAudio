@@ -458,8 +458,7 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingUSBFileCount::onE
       module->queryFileCount(Aidtopia_SerialAudio::DEV_USB);
       return this;
     case MID_USBFILECOUNT: {
-      const auto count = (static_cast<uint16_t>(paramHi) << 8) | paramLo;
-      module->m_files = count;
+      const auto count = combine(paramHi, paramLo);
       if (count > 0) return &s_init_selecting_usb;
       return &s_init_checking_sd_file_count;
     }
@@ -481,8 +480,7 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingSDFileCount::onEv
       module->queryFileCount(Aidtopia_SerialAudio::DEV_SDCARD);
       return this;
     case MID_SDFILECOUNT: {
-      const auto count = (static_cast<uint16_t>(paramHi) << 8) | paramLo;
-      module->m_files = count;
+      const auto count = combine(paramHi, paramLo);
       if (count > 0) return &s_init_selecting_sd;
       return nullptr;
     }
@@ -504,7 +502,6 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitSelectingUSB::onEvent(
       module->selectSource(Aidtopia_SerialAudio::DEV_USB);
       return this;
     case MID_ACK:
-      module->m_source = Aidtopia_SerialAudio::DEV_USB;
       return &s_init_checking_folder_count;
     default: break;
   }
@@ -522,7 +519,6 @@ Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitSelectingSD::onEvent(
       module->selectSource(Aidtopia_SerialAudio::DEV_SDCARD);
       return this;
     case MID_ACK:
-      module->m_source = Aidtopia_SerialAudio::DEV_SDCARD;
       return &s_init_checking_folder_count;
     default: break;
   }
@@ -533,14 +529,13 @@ Aidtopia_SerialAudio::InitSelectingSD Aidtopia_SerialAudio::s_init_selecting_sd;
 Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingFolderCount::onEvent(
   Aidtopia_SerialAudio *module,
   MsgID msgid,
-  uint8_t /*paramHi*/, uint8_t paramLo
+  uint8_t /*paramHi*/, uint8_t /*paramLo*/
 ) {
   switch (msgid) {
     case MID_ENTERSTATE:
       module->queryFolderCount();
       return this;
     case MID_FOLDERCOUNT:
-      module->m_folders = paramLo;
       return nullptr;
     default: break;
   }
