@@ -16,7 +16,11 @@ class Aidtopia_SerialAudio {
     // Call `begin` in `setup` an instance of the HardwareSerial (e.g., Serial1)
     // or a SoftwareSerial object that the audio module is connected too.
     template <typename StreamType>
-    void begin(StreamType &stream);
+    void begin(StreamType &stream) {
+      stream.begin(9600);
+      m_stream = &stream;
+      reset();
+    }
 
     // Call `update` each time through `loop`.
     void update();
@@ -466,14 +470,13 @@ class Aidtopia_SerialAudio {
     Timeout<MillisClock> m_timeout;
 };
 
-template <typename StreamType>
-void Aidtopia_SerialAudio::begin(StreamType &stream) {
-    stream.begin(9600);
-    m_stream = &stream;
-    reset();
-}
-
 class Aidtopia_SerialAudioWithLogging : public Aidtopia_SerialAudio {
+  public:
+    // The regular logging level includes asynchronous events and responses to
+    // queries.  The detailed level includes the bytes of all incoming and
+    // outgoing messages as well as the "ACK"s from the module.
+    void logDetail(bool detailed = true) { m_detailed = detailed; }
+
   protected:
     void onAck() override;
     void onCurrentTrack(Device device, uint16_t file_index) override;
@@ -498,6 +501,9 @@ class Aidtopia_SerialAudioWithLogging : public Aidtopia_SerialAudio {
     void printEqualizerName(Equalizer eq);
     void printModuleStateName(ModuleState state);
     void printSequenceName(Sequence seq);
+
+  private:
+    bool m_detailed = false;
 };
 
 #endif

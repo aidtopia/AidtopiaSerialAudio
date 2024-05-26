@@ -566,6 +566,7 @@ Aidtopia_SerialAudio::InitStartPlaying Aidtopia_SerialAudio::s_init_start_playin
 
 
 void Aidtopia_SerialAudioWithLogging::onAck() {
+  if (!m_detailed) return;
   Serial.println(F("ACK"));
 }
 
@@ -664,7 +665,8 @@ void Aidtopia_SerialAudioWithLogging::onMessageInvalid() {
   Serial.println(F("Invalid message received."));
 }
 
-void Aidtopia_SerialAudioWithLogging::onMessageReceived([[maybe_unused]] const Message &msg) {
+void Aidtopia_SerialAudioWithLogging::onMessageReceived(const Message &msg) {
+  if (!m_detailed) return;
   const auto *buf = msg.getBuffer();
   const auto len = msg.getLength();
   Serial.print(F("Received:"));
@@ -676,6 +678,7 @@ void Aidtopia_SerialAudioWithLogging::onMessageReceived([[maybe_unused]] const M
 }
 
 void Aidtopia_SerialAudioWithLogging::onMessageSent(const uint8_t *buf, int len) {
+  if (!m_detailed) return;
   Serial.print(F("Sent:    "));
   for (int i = 0; i < len; ++i) {
     Serial.print(F(" "));

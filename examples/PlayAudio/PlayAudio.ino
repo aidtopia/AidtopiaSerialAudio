@@ -8,10 +8,11 @@ auto constexpr play_pin = 5;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Aidtopia Serial Audio Test\n");
+  Serial.println("\nAidtopia Serial Audio Test\n");
 
   // Initialize the audio module connected to Serial1.  If you don't have
   // a hardware serial port available, you can use SoftwareSerial.
+  audio.logDetail();
   audio.begin(Serial1);
 
   pinMode(stop_pin, INPUT_PULLUP);
