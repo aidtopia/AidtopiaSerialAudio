@@ -222,6 +222,7 @@ class Aidtopia_SerialAudio {
     // to this query, so watch for a timeout error.
     void queryFirmwareVersion();
 
+  protected:
     static constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
       return static_cast<uint16_t>(hi << 8) | lo;
     }
@@ -229,7 +230,6 @@ class Aidtopia_SerialAudio {
     static constexpr uint8_t high(uint16_t x) { return x >> 8; }
     static constexpr uint8_t low(uint16_t x)  { return x & 0xFF; }
 
-  protected:
     // These are the message IDs (sometimes called commands) for the
     // messages in the serial protocol for the YX5200 and YX5300 chips.
     enum MsgID : uint8_t {
@@ -674,102 +674,45 @@ class Aidtopia_SerialAudio {
         // or a pointer to another State in order to chain a series of
         // operations together.
         virtual State *onEvent(
-          Aidtopia_SerialAudio * /*module*/,
-          MsgID /*msgid*/,
-          uint8_t /*paramHi*/,
-          uint8_t /*paramLo*/
-        ) {
-          return this;
-        }
+          Aidtopia_SerialAudio *module,
+          MsgID msgid,
+          uint8_t paramHi, uint8_t paramLo
+        );
     };
 
     struct InitResettingHardware : public State {
       State *onEvent(
-          Aidtopia_SerialAudio *module,
-          MsgID msgid,
-          uint8_t paramHi,
-          uint8_t paramLo
-      ) override {
-        switch (msgid) {
-          case MID_ENTERSTATE:
-            Serial.println(F("Resetting hardware."));
-            module->sendCommand(MID_RESET, 0, false);
-            // The default timeout is probably too short for a reset.
-            module->m_timeout.set(10000);
-            return this;
-          case MID_INITCOMPLETE:
-            return &Aidtopia_SerialAudio::s_init_getting_version;
-          case MID_ERROR:
-            if (combine(paramHi, paramLo) == EC_TIMEDOUT) {
-              Serial.println(F("No response from audio module"));
-            }
-            return nullptr;
-          default: break;
-        }
-        return this;
-      }
+        Aidtopia_SerialAudio *module,
+        MsgID msgid,
+        uint8_t paramHi, uint8_t paramLo
+      ) override;
     };
     static InitResettingHardware s_init_resetting_hardware;
 
     struct InitGettingVersion : public State {
-      State *onEvent(Aidtopia_SerialAudio *module, MsgID msgid, uint8_t paramHi, uint8_t paramLo) override {
-        switch (msgid) {
-          case MID_ENTERSTATE:
-            module->queryFirmwareVersion();
-            return this;
-          case MID_FIRMWAREVERSION:
-            return &s_init_checking_usb_file_count;
-          case MID_ERROR:
-            if (combine(paramHi, paramLo) == EC_TIMEDOUT) {
-              return &s_init_checking_usb_file_count;
-            }
-            break;
-          default: break;
-        }
-        return this;
-      }
+      State *onEvent(
+        Aidtopia_SerialAudio *module,
+        MsgID msgid,
+        uint8_t paramHi, uint8_t paramLo
+      ) override;
     };
     static InitGettingVersion s_init_getting_version;
 
     struct InitCheckingUSBFileCount : public State {
-      State *onEvent(Aidtopia_SerialAudio *module, MsgID msgid, uint8_t paramHi, uint8_t paramLo) override {
-        switch (msgid) {
-          case MID_ENTERSTATE:
-            module->queryFileCount(Aidtopia_SerialAudio::DEV_USB);
-            return this;
-          case MID_USBFILECOUNT: {
-            const auto count = (static_cast<uint16_t>(paramHi) << 8) | paramLo;
-            module->m_files = count;
-            if (count > 0) return &s_init_selecting_usb;
-            return &s_init_checking_sd_file_count;
-          }
-          case MID_ERROR:
-            return &s_init_checking_sd_file_count;
-          default: break;
-        }
-        return this;
-      }
+      State *onEvent(
+        Aidtopia_SerialAudio *module,
+        MsgID msgid,
+        uint8_t paramHi, uint8_t paramLo
+      ) override;
     };
     static InitCheckingUSBFileCount s_init_checking_usb_file_count;
     
     struct InitCheckingSDFileCount : public State {
-      State *onEvent(Aidtopia_SerialAudio *module, MsgID msgid, uint8_t paramHi, uint8_t paramLo) override {
-        switch (msgid) {
-          case MID_ENTERSTATE:
-            module->queryFileCount(Aidtopia_SerialAudio::DEV_SDCARD);
-            return this;
-          case MID_SDFILECOUNT: {
-            const auto count = (static_cast<uint16_t>(paramHi) << 8) | paramLo;
-            module->m_files = count;
-            if (count > 0) return &s_init_selecting_sd;
-            return nullptr;
-          }
-          case MID_ERROR:
-            return nullptr;
-          default: break;
-        }
-        return this;
-      }
+      State *onEvent(
+        Aidtopia_SerialAudio *module,
+        MsgID msgid,
+        uint8_t paramHi, uint8_t paramLo
+      ) override;
     };
     static InitCheckingSDFileCount s_init_checking_sd_file_count;
 
@@ -777,20 +720,8 @@ class Aidtopia_SerialAudio {
       State *onEvent(
         Aidtopia_SerialAudio *module,
         MsgID msgid,
-        uint8_t /*paramHi*/,
-        uint8_t /*paramLo*/
-      ) override {
-        switch (msgid) {
-          case MID_ENTERSTATE:
-            module->selectSource(Aidtopia_SerialAudio::DEV_USB);
-            return this;
-          case MID_ACK:
-            module->m_source = Aidtopia_SerialAudio::DEV_USB;
-            return &s_init_checking_folder_count;
-          default: break;
-        }
-        return this;
-      }
+        uint8_t paramHi, uint8_t paramLo
+      ) override;
     };
     static InitSelectingUSB s_init_selecting_usb;
 
@@ -798,20 +729,8 @@ class Aidtopia_SerialAudio {
       State *onEvent(
         Aidtopia_SerialAudio *module,
         MsgID msgid,
-        uint8_t /*paramHi*/,
-        uint8_t /*paramLo*/
-      ) override {
-        switch (msgid) {
-          case MID_ENTERSTATE:
-            module->selectSource(Aidtopia_SerialAudio::DEV_SDCARD);
-            return this;
-          case MID_ACK:
-            module->m_source = Aidtopia_SerialAudio::DEV_SDCARD;
-            return &s_init_checking_folder_count;
-          default: break;
-        }
-        return this;
-      }
+        uint8_t paramHi, uint8_t paramLo
+      ) override;
     };
     static InitSelectingSD s_init_selecting_sd;
 
@@ -819,27 +738,8 @@ class Aidtopia_SerialAudio {
       State *onEvent(
         Aidtopia_SerialAudio *module,
         MsgID msgid,
-        uint8_t /*paramHi*/,
-        uint8_t paramLo
-      ) override {
-        switch (msgid) {
-          case MID_ENTERSTATE:
-            module->queryFolderCount();
-            return this;
-          case MID_FOLDERCOUNT:
-            module->m_folders = paramLo;
-            Serial.print(F("Audio module initialized.\nSelected: "));
-            module->printDeviceName(module->m_source);
-            Serial.print(F(" with "));
-            Serial.print(module->m_files);
-            Serial.print(F(" files and "));
-            Serial.print(module->m_folders);
-            Serial.println(F(" folders"));
-            return nullptr;
-          default: break;
-        }
-        return this;
-      }
+        uint8_t paramHi, uint8_t paramLo
+      ) override;
     };
     static InitCheckingFolderCount s_init_checking_folder_count;
 
@@ -847,19 +747,8 @@ class Aidtopia_SerialAudio {
       State *onEvent(
         Aidtopia_SerialAudio *module,
         MsgID msgid,
-        uint8_t /*paramHi*/,
-        uint8_t /*paramLo*/
-      ) override {
-        switch (msgid) {
-          case MID_ENTERSTATE:
-            module->sendCommand(MID_LOOPFOLDER, 1);
-            return this;
-          case MID_ACK:
-            return nullptr;
-          default: break;
-        }
-        return this;
-      }
+        uint8_t paramHi, uint8_t paramLo
+      ) override;
     };
     static InitStartPlaying s_init_start_playing;
 

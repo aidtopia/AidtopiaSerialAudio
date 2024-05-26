@@ -162,6 +162,183 @@ void Aidtopia_SerialAudio::queryFirmwareVersion() {
 }
 
 
+Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::State::onEvent(
+  Aidtopia_SerialAudio * /*module*/,
+  MsgID /*msgid*/,
+  uint8_t /*paramHi*/,
+  uint8_t /*paramLo*/
+) {
+  return this;
+}
+
+
+Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitResettingHardware::onEvent(
+  Aidtopia_SerialAudio *module,
+  MsgID msgid,
+  uint8_t paramHi,
+  uint8_t paramLo
+) {
+  switch (msgid) {
+    case MID_ENTERSTATE:
+      Serial.println(F("Resetting hardware."));
+      module->sendCommand(MID_RESET, 0, false);
+      // The default timeout is probably too short for a reset.
+      module->m_timeout.set(10000);
+      return this;
+    case MID_INITCOMPLETE:
+      return &Aidtopia_SerialAudio::s_init_getting_version;
+    case MID_ERROR:
+      if (combine(paramHi, paramLo) == EC_TIMEDOUT) {
+        Serial.println(F("No response from audio module"));
+      }
+      return nullptr;
+    default: break;
+  }
+  return this;
+}
+
+Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitGettingVersion::onEvent(
+    Aidtopia_SerialAudio *module,
+    MsgID msgid,
+    uint8_t paramHi,
+    uint8_t paramLo
+) {
+  switch (msgid) {
+    case MID_ENTERSTATE:
+      module->queryFirmwareVersion();
+      return this;
+    case MID_FIRMWAREVERSION:
+      return &s_init_checking_usb_file_count;
+    case MID_ERROR:
+      if (combine(paramHi, paramLo) == EC_TIMEDOUT) {
+        return &s_init_checking_usb_file_count;
+      }
+      break;
+    default: break;
+  }
+  return this;
+}
+
+Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingUSBFileCount::onEvent(
+  Aidtopia_SerialAudio *module,
+  MsgID msgid,
+  uint8_t paramHi, uint8_t paramLo
+) {
+  switch (msgid) {
+    case MID_ENTERSTATE:
+      module->queryFileCount(Aidtopia_SerialAudio::DEV_USB);
+      return this;
+    case MID_USBFILECOUNT: {
+      const auto count = (static_cast<uint16_t>(paramHi) << 8) | paramLo;
+      module->m_files = count;
+      if (count > 0) return &s_init_selecting_usb;
+      return &s_init_checking_sd_file_count;
+    }
+    case MID_ERROR:
+      return &s_init_checking_sd_file_count;
+    default: break;
+  }
+  return this;
+}
+
+Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingSDFileCount::onEvent(
+  Aidtopia_SerialAudio *module,
+  MsgID msgid,
+  uint8_t paramHi, uint8_t paramLo
+) {
+  switch (msgid) {
+    case MID_ENTERSTATE:
+      module->queryFileCount(Aidtopia_SerialAudio::DEV_SDCARD);
+      return this;
+    case MID_SDFILECOUNT: {
+      const auto count = (static_cast<uint16_t>(paramHi) << 8) | paramLo;
+      module->m_files = count;
+      if (count > 0) return &s_init_selecting_sd;
+      return nullptr;
+    }
+    case MID_ERROR:
+      return nullptr;
+    default: break;
+  }
+  return this;
+}
+
+Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitSelectingUSB::onEvent(
+  Aidtopia_SerialAudio *module,
+  MsgID msgid,
+  uint8_t /*paramHi*/, uint8_t /*paramLo*/
+) {
+  switch (msgid) {
+    case MID_ENTERSTATE:
+      module->selectSource(Aidtopia_SerialAudio::DEV_USB);
+      return this;
+    case MID_ACK:
+      module->m_source = Aidtopia_SerialAudio::DEV_USB;
+      return &s_init_checking_folder_count;
+    default: break;
+  }
+  return this;
+}
+
+Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitSelectingSD::onEvent(
+  Aidtopia_SerialAudio *module,
+  MsgID msgid,
+  uint8_t /*paramHi*/, uint8_t /*paramLo*/
+) {
+  switch (msgid) {
+    case MID_ENTERSTATE:
+      module->selectSource(Aidtopia_SerialAudio::DEV_SDCARD);
+      return this;
+    case MID_ACK:
+      module->m_source = Aidtopia_SerialAudio::DEV_SDCARD;
+      return &s_init_checking_folder_count;
+    default: break;
+  }
+  return this;
+}
+
+Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitCheckingFolderCount::onEvent(
+  Aidtopia_SerialAudio *module,
+  MsgID msgid,
+  uint8_t /*paramHi*/, uint8_t paramLo
+) {
+  switch (msgid) {
+    case MID_ENTERSTATE:
+      module->queryFolderCount();
+      return this;
+    case MID_FOLDERCOUNT:
+      module->m_folders = paramLo;
+      Serial.print(F("Audio module initialized.\nSelected: "));
+      module->printDeviceName(module->m_source);
+      Serial.print(F(" with "));
+      Serial.print(module->m_files);
+      Serial.print(F(" files and "));
+      Serial.print(module->m_folders);
+      Serial.println(F(" folders"));
+      return nullptr;
+    default: break;
+  }
+  return this;
+}
+
+Aidtopia_SerialAudio::State *Aidtopia_SerialAudio::InitStartPlaying::onEvent(
+  Aidtopia_SerialAudio *module,
+  MsgID msgid,
+  uint8_t /*paramHi*/, uint8_t /*paramLo*/
+) {
+  switch (msgid) {
+    case MID_ENTERSTATE:
+      module->sendCommand(MID_LOOPFOLDER, 1);
+      return this;
+    case MID_ACK:
+      return nullptr;
+    default: break;
+  }
+  return this;
+}
+
+
+
 Aidtopia_SerialAudio::InitResettingHardware    Aidtopia_SerialAudio::s_init_resetting_hardware;
 Aidtopia_SerialAudio::InitGettingVersion       Aidtopia_SerialAudio::s_init_getting_version;
 Aidtopia_SerialAudio::InitCheckingUSBFileCount Aidtopia_SerialAudio::s_init_checking_usb_file_count;
