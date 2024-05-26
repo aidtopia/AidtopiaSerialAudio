@@ -310,11 +310,9 @@ class Aidtopia_SerialAudio {
     // Manages a buffered message with all the protocol details.
     class Message {
       public:
-        enum { START = 0x7E, VERSION = 0xFF, LENGTH = 6, END = 0xEF };
-        enum Feedback { NO_FEEDBACK = 0x00, FEEDBACK = 0x01 };
-
         Message();
 
+        enum Feedback { NO_FEEDBACK = 0x00, FEEDBACK = 0x01 };
         void set(MsgID msgid, uint16_t param, Feedback feedback = NO_FEEDBACK);
 
         const uint8_t *getBuffer() const;
@@ -332,6 +330,7 @@ class Aidtopia_SerialAudio {
         // Sums the bytes used to compute the Message's checksum.
         uint16_t sum() const;
 
+        enum : uint8_t { START = 0x7E, VERSION = 0xFF, LENGTH = 6, END = 0xEF };
         uint8_t m_buf[10];
         int m_length;
     };
