@@ -1,9 +1,6 @@
 // AidtopiaSerialAudio
 // Adrian McCarthy 2018-
 
-// A library that works with various serial audio modules,
-// like DFPlayer Mini, Catalex, etc.
-
 #include <Arduino.h>
 #include <AidtopiaSerialAudio.h>
 
@@ -282,6 +279,7 @@ void Aidtopia_SerialAudio::checkForIncomingMessage() {
 void Aidtopia_SerialAudio::checkForTimeout() {
   if (m_timeout.expired()) {
     m_timeout.cancel();
+    onError(EC_TIMEDOUT);
     if (m_state) {
       setState(m_state->onEvent(this, MID_ERROR, high(EC_TIMEDOUT), low(EC_TIMEDOUT)));
     }
@@ -290,6 +288,8 @@ void Aidtopia_SerialAudio::checkForTimeout() {
 
 void Aidtopia_SerialAudio::receiveMessage(const Message &msg) {
   callHooks(msg);
+  if (!msg.isValid()) return;
+  if (msg.getMessageID() >= MID_INITCOMPLETE) m_timeout.cancel();
   if (!m_state) return;
   setState(m_state->onEvent(this, msg.getMessageID(), msg.getParamHi(), msg.getParamLo()));
 }
@@ -299,6 +299,7 @@ void Aidtopia_SerialAudio::callHooks(const Message &msg) {
   if (!msg.isValid()) return onMessageInvalid();
 
   switch (msg.getMessageID()) {
+    // Asynchronous messages
     case 0x3A: {
       const auto mask = msg.getParamLo();
       if (mask & 0x01) onDeviceInserted(DEV_USB);
@@ -596,18 +597,18 @@ void Aidtopia_SerialAudioWithLogging::onError(uint16_t code) {
   Serial.print(code);
   Serial.print(F(": "));
   switch (code) {
-    case 0x00: Serial.println(F("Unsupported command")); break;
-    case 0x01: Serial.println(F("Module busy or no sources available")); break;
-    case 0x02: Serial.println(F("Module sleeping")); break;
-    case 0x03: Serial.println(F("Serial communication error")); break;
-    case 0x04: Serial.println(F("Bad checksum")); break;
-    case 0x05: Serial.println(F("File index out of range")); break;
-    case 0x06: Serial.println(F("Track not found")); break;
-    case 0x07: Serial.println(F("Insertion error")); break;
-    case 0x08: Serial.println(F("SD card error")); break;
-    case 0x0A: Serial.println(F("Entered sleep mode")); break;
-    case 0x100: Serial.println(F("Timed out")); break;
-    default:   Serial.println(F("Unknown error code")); break;
+    case EC_UNSUPPORTED:    Serial.println(F("Unsupported command")); break;
+    case EC_NOSOURCES:      Serial.println(F("Module busy or no sources available")); break;
+    case EC_SLEEPING:       Serial.println(F("Module sleeping")); break;
+    case EC_SERIALERROR:    Serial.println(F("Serial communication error")); break;
+    case EC_BADCHECKSUM:    Serial.println(F("Bad checksum")); break;
+    case EC_FILEOUTOFRANGE: Serial.println(F("File index out of range")); break;
+    case EC_TRACKNOTFOUND:  Serial.println(F("Track not found")); break;
+    case EC_INSERTIONERROR: Serial.println(F("Insertion error")); break;
+    case EC_SDCARDERROR:    Serial.println(F("SD card error")); break;
+    case EC_ENTEREDSLEEP:   Serial.println(F("Entered sleep mode")); break;
+    case EC_TIMEDOUT:       Serial.println(F("Timed out")); break;
+    default:                Serial.println(F("Unknown error code")); break;
   }
 }
 
