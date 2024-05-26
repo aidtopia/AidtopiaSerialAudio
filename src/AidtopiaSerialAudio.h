@@ -335,69 +335,14 @@ class Aidtopia_SerialAudio {
         int m_length;
     };
 
-#if 0
     // These hooks are called when messages are received from the audio module.
-    void onAck() {}
-    void onDeviceInserted(Device src) {}
-    void onDeviceRemoved(Device src) {}
-    void onError(uint16_t code) {}
-    void onFinishedFile(Device device, uint16_t file_index) {}
-    void onMessageInvalid() {}
-    void onMessageReceived(const Message &msg) {}
-    void onMessageSent(const uint8_t *buf, int len) {}
-#else
-    void onAck() {
-      Serial.println(F("ACK"));
-    }
-
-    void onCurrentTrack(Device device, uint16_t file_index) {
-      printDeviceName(device);
-      Serial.print(F(" current file index: "));
-      Serial.println(file_index);
-    }
-
-    void onDeviceInserted(Device src) {
-      Serial.print(F("Device inserted: "));
-      printDeviceName(src);
-      Serial.println();
-    }
-
-    void onDeviceRemoved(Device src) {
-      printDeviceName(src);
-      Serial.println(F(" removed."));
-    }
-
-    void onEqualizer(Equalizer eq) {
-      Serial.print(F("Equalizer: "));
-      printEqualizerName(eq);
-      Serial.println();
-    }
-
-    void onError(uint16_t code) {
-      Serial.print(F("Error "));
-      Serial.print(code);
-      Serial.print(F(": "));
-      switch (code) {
-        case 0x00: Serial.println(F("Unsupported command")); break;
-        case 0x01: Serial.println(F("Module busy or no sources available")); break;
-        case 0x02: Serial.println(F("Module sleeping")); break;
-        case 0x03: Serial.println(F("Serial communication error")); break;
-        case 0x04: Serial.println(F("Bad checksum")); break;
-        case 0x05: Serial.println(F("File index out of range")); break;
-        case 0x06: Serial.println(F("Track not found")); break;
-        case 0x07: Serial.println(F("Insertion error")); break;
-        case 0x08: Serial.println(F("SD card error")); break;
-        case 0x0A: Serial.println(F("Entered sleep mode")); break;
-        case 0x100: Serial.println(F("Timed out")); break;
-        default:   Serial.println(F("Unknown error code")); break;
-      }
-    }
-
-    void onDeviceFileCount(Device device, uint16_t count) {
-      printDeviceName(device);
-      Serial.print(F(" file count: "));
-      Serial.println(count);
-    }
+    virtual void onAck();
+    virtual void onCurrentTrack(Device device, uint16_t file_index);
+    virtual void onDeviceFileCount(Device device, uint16_t count);
+    virtual void onDeviceInserted(Device src);
+    virtual void onDeviceRemoved(Device src);
+    virtual void onEqualizer(Equalizer eq);
+    virtual void onError(uint16_t code);
 
     // Note that this hook receives a file index, even if the track
     // was initialized using something other than its file index.
@@ -411,144 +356,30 @@ class Aidtopia_SerialAudio {
     // This hook does not trigger when an inserted track finishes.
     // If you need to know that, you can try watching for a brief
     // blink on the BUSY pin of the DF Player Mini.
-    void onFinishedFile(Device device, uint16_t file_index) {
-      Serial.print(F("Finished playing file: "));
-      printDeviceName(device);
-      Serial.print(F(" "));
-      Serial.println(file_index);
-    }
+    virtual void onFinishedFile(Device device, uint16_t file_index);
+    virtual void onFirmwareVersion(uint16_t version);
+    virtual void onFolderCount(uint16_t count);
+    virtual void onFolderTrackCount(uint16_t count);
+    virtual void onInitComplete(uint8_t devices);
+    virtual void onMessageInvalid();
+    virtual void onMessageReceived(const Message &msg);
+    virtual void onMessageSent(const uint8_t *buf, int len);
+    virtual void onPlaybackSequence(Sequence seq);
+    virtual void onStatus(Device device, ModuleState state);
+    virtual void onVolume(uint8_t volume);
 
-    void onFirmwareVersion(uint16_t version) {
-      Serial.print(F("Firmware Version: "));
-      Serial.println(version);
-    }
-
-    void onFolderCount(uint16_t count) {
-      Serial.print(F("Folder count: "));
-      Serial.println(count);
-    }
-
-    void onFolderTrackCount(uint16_t count) {
-      Serial.print(F("Folder track count: "));
-      Serial.println(count);
-    }
-
-    void onInitComplete(uint8_t devices) {
-      Serial.print(F("Hardware initialization complete.  Device(s) online:"));
-      if (devices & (1u << DEV_SDCARD)) Serial.print(F(" SD Card"));
-      if (devices & (1u << DEV_USB))    Serial.print(F(" USB"));
-      if (devices & (1u << DEV_AUX))    Serial.print(F(" AUX"));
-      if (devices & (1u << DEV_FLASH))  Serial.print(F(" Flash"));
-      Serial.println();
-    }
-
-    void onMessageInvalid() {
-      Serial.println(F("Invalid message received."));
-    }
-
-    void onMessageReceived([[maybe_unused]] const Message &msg) {
-#if 0
-      const auto *buf = msg.getBuffer();
-      const auto len = msg.getLength();
-      Serial.print(F("Received:"));
-      for (int i = 0; i < len; ++i) {
-        Serial.print(F(" "));
-        Serial.print(buf[i], HEX);
-      }
-      Serial.println();
-#endif
-    }
-    
-    void onMessageSent(const uint8_t * /* buf */, int /* len */) {
-#if 0
-      Serial.print(F("Sent:    "));
-      for (int i = 0; i < len; ++i) {
-        Serial.print(F(" "));
-        Serial.print(buf[i], HEX);
-      }
-      Serial.println();
-#endif
-    }
-
-    void onPlaybackSequence(Sequence seq) {
-      Serial.print(F("Playback Sequence: "));
-      printSequenceName(seq);
-      Serial.println();
-    }
-    
-    void onStatus(Device device, ModuleState state) {
-      Serial.print(F("State: "));
-      if (device != DEV_SLEEP) {
-        printDeviceName(device);
-        Serial.print(F(" "));
-      }
-      printModuleStateName(state);
-      Serial.println();
-    }
-
-    void onVolume(uint8_t volume) {
-      Serial.print(F("Volume: "));
-      Serial.println(volume);
-    }
-
-    void printDeviceName(Device src) {
-      switch (src) {
-        case DEV_USB:    Serial.print(F("USB")); break;
-        case DEV_SDCARD: Serial.print(F("SD Card")); break;
-        case DEV_AUX:    Serial.print(F("AUX")); break;
-        case DEV_SLEEP:  Serial.print(F("SLEEP (does this make sense)")); break;
-        case DEV_FLASH:  Serial.print(F("FLASH")); break;
-        default:         Serial.print(F("Unknown Device")); break;
-      }
-    }
-
-    void printEqualizerName(Equalizer eq) {
-      switch (eq) {
-        case EQ_NORMAL:    Serial.print(F("Normal"));    break;
-        case EQ_POP:       Serial.print(F("Pop"));       break;
-        case EQ_ROCK:      Serial.print(F("Rock"));      break;
-        case EQ_JAZZ:      Serial.print(F("Jazz"));      break;
-        case EQ_CLASSICAL: Serial.print(F("Classical")); break;
-        case EQ_BASS:      Serial.print(F("Bass"));      break;
-        default:           Serial.print(F("Unknown EQ")); break;
-      }
-    }
-
-    void printModuleStateName(ModuleState state) {
-      switch (state) {
-        case MS_STOPPED: Serial.print(F("Stopped")); break;
-        case MS_PLAYING: Serial.print(F("Playing")); break;
-        case MS_PAUSED:  Serial.print(F("Paused"));  break;
-        case MS_ASLEEP:  Serial.print(F("Asleep"));  break;
-        default:         Serial.print(F("???"));     break;
-      }
-    }
-
-    void printSequenceName(Sequence seq) {
-      switch (seq) {
-        case SEQ_LOOPALL:    Serial.print(F("Loop All")); break;
-        case SEQ_LOOPFOLDER: Serial.print(F("Loop Folder")); break;
-        case SEQ_LOOPTRACK:  Serial.print(F("Loop Track")); break;
-        case SEQ_RANDOM:     Serial.print(F("Random")); break;
-        case SEQ_SINGLE:     Serial.print(F("Single")); break;
-        default:             Serial.print(F("???")); break;
-      }
-    }
-#endif
+    void printDeviceName(Device src);
+    void printEqualizerName(Equalizer eq);
+    void printModuleStateName(ModuleState state);
+    void printSequenceName(Sequence seq);
 
   private:
     void checkForIncomingMessage();
-
     void checkForTimeout();
-
     void receiveMessage(const Message &msg);
-
     void callHooks(const Message &msg);
-
     void sendMessage(const Message &msg);
-
     void sendCommand(MsgID msgid, uint16_t param = 0, bool feedback = true);
-
     void sendQuery(MsgID msgid, uint16_t param = 0);
 
     // A State tells us how to handle messages received from the module.
