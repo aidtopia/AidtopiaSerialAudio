@@ -325,7 +325,7 @@ void Aidtopia_SerialAudio::callHooks(const Message &msg) {
       if (mask & 0x01) devices = devices | (1u << DEV_USB);
       if (mask & 0x02) devices = devices | (1u << DEV_SDCARD);
       if (mask & 0x04) devices = devices | (1u << DEV_AUX);
-      if (mask & 0x10) devices = devices | (1u << DEV_FLASH);
+      if (mask & 0x08) devices = devices | (1u << DEV_FLASH);
       return onInitComplete(devices);
     }
 
@@ -334,11 +334,6 @@ void Aidtopia_SerialAudio::callHooks(const Message &msg) {
 
     // Query responses
     case 0x42: {
-      // Only Flyron documents this response to the status query.
-      // The DFPlayer Mini always seems to report SDCARD even when
-      // the selected and active device is USB, so maybe it uses
-      // the high byte to signal something else?  Catalex also
-      // always reports the SDCARD, but it only has an SDCARD.
       Device device = DEV_SLEEP;
       switch (msg.getParamHi()) {
         case 0x01: device = DEV_USB;     break;
@@ -576,6 +571,12 @@ void Aidtopia_SerialAudioWithLogging::onCurrentTrack(Device device, uint16_t fil
   Serial.println(file_index);
 }
 
+void Aidtopia_SerialAudioWithLogging::onDeviceFileCount(Device device, uint16_t count) {
+  printDeviceName(device);
+  Serial.print(F(" file count: "));
+  Serial.println(count);
+}
+
 void Aidtopia_SerialAudioWithLogging::onDeviceInserted(Device src) {
   Serial.print(F("Device inserted: "));
   printDeviceName(src);
@@ -613,12 +614,6 @@ void Aidtopia_SerialAudioWithLogging::onError(uint16_t code) {
   }
 }
 
-void Aidtopia_SerialAudioWithLogging::onDeviceFileCount(Device device, uint16_t count) {
-  printDeviceName(device);
-  Serial.print(F(" file count: "));
-  Serial.println(count);
-}
-
 // Note that this hook receives a file index, even if the track was selected
 // with a track number.
 //
@@ -653,9 +648,9 @@ void Aidtopia_SerialAudioWithLogging::onFolderTrackCount(uint16_t count) {
 }
 
 void Aidtopia_SerialAudioWithLogging::onInitComplete(uint8_t devices) {
-  Serial.print(F("Audio module initialized.  Device(s) online:"));
-  if (devices & (1u << DEV_SDCARD)) Serial.print(F(" SD Card"));
+  Serial.print(F("Device(s) online:"));
   if (devices & (1u << DEV_USB))    Serial.print(F(" USB"));
+  if (devices & (1u << DEV_SDCARD)) Serial.print(F(" SD Card"));
   if (devices & (1u << DEV_AUX))    Serial.print(F(" AUX"));
   if (devices & (1u << DEV_FLASH))  Serial.print(F(" Flash"));
   Serial.println();
@@ -695,10 +690,8 @@ void Aidtopia_SerialAudioWithLogging::onPlaybackSequence(Sequence seq) {
 
 void Aidtopia_SerialAudioWithLogging::onStatus(Device device, ModuleState state) {
   Serial.print(F("State: "));
-  if (device != DEV_SLEEP) {
-    printDeviceName(device);
-    Serial.print(F(" "));
-  }
+  printDeviceName(device);
+  Serial.print(F(" "));
   printModuleStateName(state);
   Serial.println();
 }
@@ -713,7 +706,7 @@ void Aidtopia_SerialAudioWithLogging::printDeviceName(Device src) {
     case DEV_USB:    Serial.print(F("USB")); break;
     case DEV_SDCARD: Serial.print(F("SD Card")); break;
     case DEV_AUX:    Serial.print(F("AUX")); break;
-    case DEV_SLEEP:  Serial.print(F("SLEEP (does this make sense)")); break;
+    case DEV_SLEEP:  Serial.print(F("SLEEP")); break;
     case DEV_FLASH:  Serial.print(F("FLASH")); break;
     default:         Serial.print(F("Unknown Device")); break;
   }

@@ -228,8 +228,9 @@ class Aidtopia_SerialAudio {
     void queryFirmwareVersion();
 
   protected:
-    // These are the message IDs (sometimes called commands) for the
-    // messages in the serial protocol for the YX5200 and YX5300 chips.
+  public:  // TEMPORARILY CHANGING VISIBILITY FOR RESEARCH
+    // These are the message IDs for the serial protocol.  Different modules
+    // support different subsets of them.
     enum MsgID : uint8_t {
       // First, the commands
       MID_PLAYNEXT          = 0x01,
@@ -238,18 +239,18 @@ class Aidtopia_SerialAudio {
       MID_VOLUMEUP          = 0x04,
       MID_VOLUMEDOWN        = 0x05,
       MID_SETVOLUME         = 0x06,
-      MID_SELECTEQ          = 0X07,
+      MID_SELECTEQ          = 0x07,
       MID_LOOPFILE          = 0x08,
       MID_LOOPFLASHTRACK    = MID_LOOPFILE,  // Alternate msg not used
       MID_SELECTSOURCE      = 0x09,
       MID_SLEEP             = 0x0A,
-      MID_WAKE              = 0x0B,
+      MID_WAKE              = 0x0B,  // If not supported, use MID_SELECTSOURCE
       MID_RESET             = 0x0C,
       MID_RESUME            = 0x0D,
       MID_UNPAUSE           = MID_RESUME,
       MID_PAUSE             = 0x0E,
       MID_PLAYFROMFOLDER    = 0x0F,
-      MID_VOLUMEADJUST      = 0x10,  // Seems busted, use MID_SETVOLUME
+      MID_AMPLIFIER         = 0x10,  // Documented by Flyron, but not supported
       MID_LOOPALL           = 0x11,
       MID_PLAYFROMMP3       = 0x12,  // "MP3" here refers to name of folder
       MID_INSERTADVERT      = 0x13,
@@ -271,6 +272,10 @@ class Aidtopia_SerialAudio {
       MID_FINISHEDFLASHFILE = 0x3E,
 
       // Quasi-asynchronous
+      // This arrives some time after MID_RESET (or power on), so I've been
+      // viewing it as an asynchronous notification.  The Flyron documentation
+      // says the user can send this to query which storage devices are online,
+      // but that doesn't work for any of the modules I've tried.
       MID_INITCOMPLETE      = 0x3F,
 
       // Basic replies
@@ -286,7 +291,7 @@ class Aidtopia_SerialAudio {
       MID_USBFILECOUNT      = 0x47,
       MID_SDFILECOUNT       = 0x48,
       MID_FLASHFILECOUNT    = 0x49,
-      // no 0x4A?
+      // no 0x4A? MID_AUXFILECOUNT?
       MID_CURRENTUSBFILE    = 0x4B,
       MID_CURRENTSDFILE     = 0x4C,
       MID_CURRENTFLASHFILE  = 0x4D,
@@ -296,7 +301,7 @@ class Aidtopia_SerialAudio {
       // We're going to steal an ID for our state machine's use.
       MID_ENTERSTATE        = 0x00
     };
-
+  protected:
     enum ErrorCode : uint16_t {
       EC_UNSUPPORTED        = 0x00,  // MsgID used is not supported
       EC_NOSOURCES          = 0x01,  // module busy or no sources installed
@@ -366,10 +371,13 @@ class Aidtopia_SerialAudio {
     void checkForTimeout();
     void receiveMessage(const Message &msg);
     void callHooks(const Message &msg);
+
+  public:  // TEMPORARILY CHANGE VISIBILITY FOR RESEARCH
     void sendMessage(const Message &msg);
     void sendCommand(MsgID msgid, uint16_t param = 0, bool feedback = true);
     void sendQuery(MsgID msgid, uint16_t param = 0);
 
+  private:
     // A State tells us how to handle messages received from the module.
     struct State {
         // The return value is a pointer to the new State.  You can return
