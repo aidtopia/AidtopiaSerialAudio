@@ -15,13 +15,15 @@ The devices I've tested may be clones.  I suspect there may be multiple versions
 
 ### Audio Modules
 
-* DFPlayer Mini
+* DFRobot DFPlayer Mini
 
 * Catalex Serial MP3 Player
 
-* MP3-TF-16P or FN-M16P
+* Flyron Tech MP3-TF-16P or FN-M16P
 
 The BY8001-16P is a different beast, perhaps based on an older version of these chips.  Worth supporting?  The chip has a serial mode controlled by the absence or presence of three resistors.
+
+The DFPlayer Mini looks like it might be a branded version of Flyron Tech's MP3-TF-16P.
 
 In all cases, there seem to be clones and perhaps counterfeits.  At full retail, these can go for as much as $10, but if you shop around, you can often get them for $2 or less, especially if you're willing to buy in bulk or wait for slow shipments from China.
 
@@ -136,15 +138,11 @@ In either case, you can track changes to the availability of source devices by w
 
 Once initialization is complete, the module will probably default to selecting one of the source devices as the "current" device.  If the USB is among the devices online, it will be selected.  If only the SD card is online, it will be selected.  Nonetheless, it is highly recommended to explicitly select the device you want with the Select Source (0x09) message.
 
-> Unfortunately, the Select Source message doesn't seem to do any error validation.  If you attempt to select a source that's not online, the selection doesn't actually change and there's no error message.  If you attempt to select an undefined device, you also don't get an error message.
-
-> In theory, you could check which device is selected by sending the Query Status (0x42) command, but that doesn't seem to be reliable.  Except when the module is asleep, it always reports that the SD Card is selected.
-
 Therefore the recommended procedure is:
 
 1.  Reset the module.
 2.  If you get an error code of 1, prompt the user to insert a source device and watch for the Device Inserted (0x3A) message.
-3.  If you get an Initialization Complete (3F) message, verify which other devices are online by checking for non-zero file counts.
+3.  If you get an Initialization Complete (0x3F) message, verify which other devices are online by checking for non-zero file counts.
 4.  Explicitly select the source device you want to use.
 5.  Continue to watch for Device Inserted (0x3A) and Device Removed (0x3B) messages.
 
@@ -168,10 +166,6 @@ The devices have a pre-set selection of equalizer settings:
 * Jazz
 * Classical
 * Bass
-
-On the Catalex, the equalizer selection can be changed during playback.
-
-Changing the selection on the DFPlayer Mini, however, while a file is playing, interrupts the playback.  To safely change the EQ selection on the fly: pause, set the EQ, and resume playback.
 
 #### Playing by Index
 
@@ -200,7 +194,9 @@ TODO:  Update to check with USB sources
 
 ##### Sleep and Wake
 
-DFPlayer Mini:  Sleep (0x0A) doesn't seem to be useful.  It does indeed change the reported state of the device, but it doesn't lower the quiescent current draw (about 20 mA).  Wake (0x0B) reports an error (module sleeping!) and doesn't seem to change much.  You can explicitly set the device (0x09) after waking, which seems to work.  But it might be more robust to just Reset (0x0C) to wake from sleeping, assuming it ever makes sense to sleep.
+Putting the module to sleep does not lower the quiescent current draw.  (For best results, ensure the player is stopped before putting it to sleep.)
+
+The wake command is not supported by some modules.  Some modules will not even execute a reset command while sleeping.  Selecting a valid source device, however, will wake the device.  In a sense, when the device is asleep, it's as though no source device is selected.  For other modules, being asleep is as though the selected device is the "sleep" device.
 
 ##### Enabling and Disabling the DACs
 
@@ -223,7 +219,7 @@ A better way to save a few milliamps is to disable the DAC (0x1A,1), which drops
 | Loop Flash Track | 0x08 | High: _flash folder_<br>Low: _track_ | The high byte determines a folder in the flash memory source device and the low byte selects the track. |
 | Select Source Device | 0x09 | 0: USB drive<br>1: SD card<br>2: AUX<br>3: Sleep?<br>4: Flash | When multiple sources are available, this command lets you select one as the "current" source.  AUX and FLASH are not readily available on most modules.  In theory, you can connect a USB drive. TBD:  Understand why Sleep is an option here and how it interacts with other sleep and wake commands. |
 | Sleep | 0x0A | 0 | Seems pointless. |
-| Wake | 0x0B | 0 | Seems buggy. |
+| Wake | 0x0B | 0 | Often not supported. |
 | Reset | 0x0C | 0 | Re-initializes the module with defaults.  Initialization is not instantaneous, and it typically causes the module to send a bitmask of which sources are available. |
 | Resume<br>("unpause")| 0x0D | 0 | Resume playing (typically sent when playback is paused). Can also be used 100 ms after a track finishes playing in order to play the next track. |
 | Pause | 0x0E | 0 | |

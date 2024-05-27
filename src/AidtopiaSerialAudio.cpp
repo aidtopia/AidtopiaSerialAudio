@@ -25,10 +25,13 @@ void Aidtopia_SerialAudio::reset() {
 
 void Aidtopia_SerialAudio::selectSource(Device device) {
   switch (device) {
-    case DEV_USB:    sendCommand(MID_SELECTSOURCE, 1); break;
-    case DEV_SDCARD: sendCommand(MID_SELECTSOURCE, 2); break;
-    case DEV_FLASH:  sendCommand(MID_SELECTSOURCE, 5); break;
-    default: break;
+    case DEV_USB:    [[fallthrough]];
+    case DEV_SDCARD: [[fallthrough]];
+    case DEV_FLASH:
+        sendCommand(MID_SELECTSOURCE, static_cast<uint16_t>(device));
+        break;
+    default:
+        break;
   }
 }
 
@@ -302,30 +305,26 @@ void Aidtopia_SerialAudio::callHooks(const Message &msg) {
     // Asynchronous messages
     case 0x3A: {
       const auto mask = msg.getParamLo();
-      if (mask & 0x01) onDeviceInserted(DEV_USB);
-      if (mask & 0x02) onDeviceInserted(DEV_SDCARD);
-      if (mask & 0x04) onDeviceInserted(DEV_AUX);
+      if (mask & DEV_USB)    onDeviceInserted(DEV_USB);
+      if (mask & DEV_SDCARD) onDeviceInserted(DEV_SDCARD);
+      if (mask & DEV_AUX)    onDeviceInserted(DEV_AUX);
       return;
     }
     case 0x3B: {
       const auto mask = msg.getParamLo();
-      if (mask & 0x01) onDeviceRemoved(DEV_USB);
-      if (mask & 0x02) onDeviceRemoved(DEV_SDCARD);
-      if (mask & 0x04) onDeviceRemoved(DEV_AUX);
+      if (mask & DEV_USB)    onDeviceRemoved(DEV_USB);
+      if (mask & DEV_SDCARD) onDeviceRemoved(DEV_SDCARD);
+      if (mask & DEV_AUX)    onDeviceRemoved(DEV_AUX);
       return;
     }
-    case 0x3C: return onFinishedFile(DEV_USB, msg.getParam());
+    case 0x3C: return onFinishedFile(DEV_USB,    msg.getParam());
     case 0x3D: return onFinishedFile(DEV_SDCARD, msg.getParam());
-    case 0x3E: return onFinishedFile(DEV_FLASH, msg.getParam());
+    case 0x3E: return onFinishedFile(DEV_FLASH,  msg.getParam());
 
     // Initialization complete
     case 0x3F: {
-      uint16_t devices = 0;
-      const auto mask = msg.getParamLo();
-      if (mask & 0x01) devices = devices | (1u << DEV_USB);
-      if (mask & 0x02) devices = devices | (1u << DEV_SDCARD);
-      if (mask & 0x04) devices = devices | (1u << DEV_AUX);
-      if (mask & 0x08) devices = devices | (1u << DEV_FLASH);
+      uint8_t const devices =
+        msg.getParamLo() & (DEV_USB | DEV_SDCARD | DEV_AUX | DEV_FLASH);
       return onInitComplete(devices);
     }
 
@@ -334,16 +333,21 @@ void Aidtopia_SerialAudio::callHooks(const Message &msg) {
 
     // Query responses
     case 0x42: {
-      Device device = DEV_SLEEP;
-      switch (msg.getParamHi()) {
-        case 0x01: device = DEV_USB;     break;
-        case 0x02: device = DEV_SDCARD;  break;
-      }
+      // The high byte of the parameter indicates which storage device is
+      // currently selected.  When the module is asleep, it's supposed to be
+      // DEV_SLEEP, but sometimes we just get 0.  It seems "sleeping" means
+      // selected the null device.
+      auto const paramHi = msg.getParamHi();
+      auto const device =
+        (paramHi == 0) ? DEV_SLEEP : static_cast<Device>(paramHi);
+
       ModuleState state = MS_ASLEEP;
-      switch (msg.getParamLo()) {
-        case 0x00: state = MS_STOPPED;  break;
-        case 0x01: state = MS_PLAYING;  break;
-        case 0x02: state = MS_PAUSED;   break;
+      if (device != DEV_SLEEP) {
+        switch (msg.getParamLo()) {
+          case 0x00: state = MS_STOPPED;  break;
+          case 0x01: state = MS_PLAYING;  break;
+          case 0x02: state = MS_PAUSED;   break;
+        }
       }
       return onStatus(device, state);
     }
@@ -649,10 +653,10 @@ void Aidtopia_SerialAudioWithLogging::onFolderTrackCount(uint16_t count) {
 
 void Aidtopia_SerialAudioWithLogging::onInitComplete(uint8_t devices) {
   Serial.print(F("Device(s) online:"));
-  if (devices & (1u << DEV_USB))    Serial.print(F(" USB"));
-  if (devices & (1u << DEV_SDCARD)) Serial.print(F(" SD Card"));
-  if (devices & (1u << DEV_AUX))    Serial.print(F(" AUX"));
-  if (devices & (1u << DEV_FLASH))  Serial.print(F(" Flash"));
+  if (devices & DEV_USB)    Serial.print(F(" USB"));
+  if (devices & DEV_SDCARD) Serial.print(F(" SD Card"));
+  if (devices & DEV_AUX)    Serial.print(F(" AUX"));
+  if (devices & DEV_FLASH)  Serial.print(F(" Flash"));
   Serial.println();
 }
 
@@ -706,8 +710,8 @@ void Aidtopia_SerialAudioWithLogging::printDeviceName(Device src) {
     case DEV_USB:    Serial.print(F("USB")); break;
     case DEV_SDCARD: Serial.print(F("SD Card")); break;
     case DEV_AUX:    Serial.print(F("AUX")); break;
-    case DEV_SLEEP:  Serial.print(F("SLEEP")); break;
     case DEV_FLASH:  Serial.print(F("FLASH")); break;
+    case DEV_SLEEP:  Serial.print(F("SLEEP")); break;
     default:         Serial.print(F("Unknown Device")); break;
   }
 }
