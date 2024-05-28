@@ -5,13 +5,14 @@ DRAFT 2019-05-11
 
 ## Introduction
 
-NOTE:  Some of these might be YX5200 rather than YX5300.
+There is a plethora of audio player modules (MP3 and WAV) that are controlled by serial commands.  The most common ones I've encountered are branded DFPlayer Mini and Catalex.
 
-The YX5200 and YX5300 are MP3 and WAV decoder chips that can be controlled and queried using a serial protocol.  These chips are the heart of inexpensive audio modules such as the DFPlayer Mini, the Catalex serial MP3 board, and clones.
+But there are multiple versions of each, as well as knock offs and outright counterfeits.  They implement different subsets of features and each have their own constellation of bugs.
 
-The datasheets for these chips are in Chinese, and the translations to English are incomplete, confusing, ambiguous, and sometimes wrong.  The intent of this document is to be a more complete and accurate explanation of how to interface to modules based on this chip.  The information here is based on the commonly found English translations of the datasheet, experiments with DFPlayer Mini and Catalex MP3 boards, and nuggets of information contained in the open source demos and libraries others have written to interface microcontrollers to these devices.  See the References section.
+Documentation is fragmented, poorly translated, incomplete, and sometimes inaccurate.  There are many libraries out there, some of which are pretty good, but usually just for one or two specific versions.
 
-The devices I've tested may be clones.  I suspect there may be multiple versions of the chips, with slightly different sets of bugs.
+My goal is to produce more complete documentation for these boards, and to offer a library that adapts to the quirks in the boards out there.  I want an easy-to-use interface, without delays, that robustly handles these modules, regardless of which one you plug into your project.
+
 
 ### Audio Modules
 
@@ -224,7 +225,7 @@ A better way to save a few milliamps is to disable the DAC (0x1A,1), which drops
 | Resume<br>("unpause")| 0x0D | 0 | Resume playing (typically sent when playback is paused). Can also be used 100 ms after a track finishes playing in order to play the next track. |
 | Pause | 0x0E | 0 | |
 | Play From Folder | 0x0F | High: _folder number_<br>Low: _track number_ | Unlike Play File Number, this selects the folder by converting the high byte of the parameter into a two-decimal-digit string.  For example, folder 0x05 means "05" and folder 0x0A means "10".  Likewise the track number is matched against the file name that begins with a three or four digit representation of the value in the low byte of the parameter.  For example, 0x1A will match a file with a name like "026 Yankee Doodle.wav". |
-| Volume Adjust | 0x10 | High: _enable_<br>Low: _gain_ | This command is rejected by the modules I have.  I suspect it was to independently enable and set the volume for the speaker amplifier.  The more accurate versions of the datasheet don't list this command. |
+| Volume Adjust | 0x10 | High: _enable_<br>Low: _gain_ | This command is rejected by the modules I have. |
 | Loop All Files | 0x11 | 1: start looping<br>2: stop looping<br> | Plays all the files of the selected source device, repeatedly. |
 | Play From "MP3" Folder | 0x12 | _track_ | Like Play From Folder, but the folder name must be "MP3" and the track number can use the full 16-bits.  For speed, it's recommended that track numbers don't exceed 3000 (0x0BB8). Doesn't work on Catalex. |
 | Insert From "ADVERT" Folder | 0x13 | _track_ | Interrupts the currently playing track and plays the selected track from a folder named "ADVERT".  When the inserted track completes, the interrupted track immediately resumes from where it left off.  There is no message sent when the inserted track completes, though, on the DFPlayer Mini, you could watch for the brief blink on the BUSY line.  Documentation seems to suggest that this be used to interrupt tracks from the MP3 folder, but it works regardless of where the original track is located.  For speed, it's recommended that track numbers don't exceed 3000.  If you try to insert when nothing is playing (stopped or paused), you'll get an insertion error. Doesn't work on Catalex. |
@@ -275,3 +276,7 @@ Queries have a natural response or an error, so it's generally not necessary to 
 [Catalex documentation](http://geekmatic.in.ua/pdf/Catalex_MP3_board.pdf)
 
 [Picaxe SPE035](http://www.picaxe.com/docs/spe035.pdf) (a board for interfacing to a DFPlayer Mini)
+
+[Garry's Blog](https://garrysblog.com/2022/06/12/mp3-dfplayer-notes-clones-noise-speakers-wrong-file-plays-and-no-library/) notes the variety of versions of just the DFPlayer Mini.
+
+[DFPlayer Analyzer] https://github.com/ghmartin77/DFPlayerAnalyzer is a project that helps to uncover the quirks of your particular module.
