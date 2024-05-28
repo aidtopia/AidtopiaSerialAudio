@@ -142,8 +142,14 @@ class Aidtopia_SerialAudio {
     // If no track is currently playing (e.g., if the device is
     // stopped or paused), this will result in an "insertion error."
     //
-    // You cannot insert while an inserted track is alrady playing.
+    // You cannot insert while an inserted track is already playing.
     void insertAdvert(uint16_t track);
+    
+    // Insert an advertisement from alternative ADVERT folders.
+    //
+    // Selects the track [0..255] from the ADVERT*n* folder, where
+    // *n* is the a folder number [1..9].
+    void insertAdvert(uint8_t folder, uint8_t track);
 
     // Stops a track that was inserted with `insertAdvert`.  The
     // interrupted track will resume from where it was.
@@ -263,8 +269,9 @@ class Aidtopia_SerialAudio {
       MID_RANDOMPLAY        = 0x18,
       MID_LOOPCURRENTFILE   = 0x19,
       MID_DISABLEDAC        = 0x1A,
-      MID_PLAYLIST          = 0x1B,  // Might not work, unusual message length
-      MID_PLAYWITHVOLUME    = 0x1C,  // seems redundant
+      MID_PLAYLIST          = 0x21,  // Might not work, unusual message length
+      MID_PLAYWITHVOLUME    = 0x22,  // seems redundant
+      MID_INSERTADVERTN     = 0x25,
 
       // Asynchronous messages from the module
       MID_DEVICEINSERTED    = 0x3A,

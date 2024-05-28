@@ -1,52 +1,47 @@
-# Serial MP3/WAV Players
+# Serial Audio Players
 
 Adrian McCarthy
 DRAFT 2019-05-11
 
 ## Introduction
 
-There is a plethora of audio player modules (MP3 and WAV) that are controlled by serial commands.  The most common ones I've encountered are branded DFPlayer Mini and Catalex.
+There is a plethora of audio player modules (MP3 and WAV) that are controlled by serial commands.  The most common ones I've encountered are branded DFPlayer Mini and Catalex.  But these are likely brands applied to whitelabel products from various manufacturers.  For example, the DFPlayer Mini appears to be a branded version of MP3-TF-16P from Flyron Tech.
 
 But there are multiple versions of each, as well as knock offs and outright counterfeits.  They implement different subsets of features and each have their own constellation of bugs.
 
 Documentation is fragmented, poorly translated, incomplete, and sometimes inaccurate.  There are many libraries out there, some of which are pretty good, but usually just for one or two specific versions.
 
-My goal is to produce more complete documentation for these boards, and to offer a library that adapts to the quirks in the boards out there.  I want an easy-to-use interface, without delays, that robustly handles these modules, regardless of which one you plug into your project.
-
+When purchasing a serial audio player, it can be difficult to know exactly which one you'll get.  My goal is to produce more complete documentation for these boards, and to offer a library that adapts to the quirks of whatever module you insert into your project.  I want an easy-to-use interface, without delays, that robustly handles these modules, regardless of which one you plug into your project.
 
 ### Audio Modules
 
-* DFRobot DFPlayer Mini
-
 * Catalex Serial MP3 Player
-
+* DFRobot DFPlayer Mini
 * Flyron Tech MP3-TF-16P or FN-M16P
 
-The BY8001-16P is a different beast, perhaps based on an older version of these chips.  Worth supporting?  The chip has a serial mode controlled by the absence or presence of three resistors.
+The BY8001-16P is a different beast, perhaps based on an older version of these chips.  Is it worth supporting?  The chip has a serial mode controlled by the absence or presence of three resistors.  The pinout is different.  There's a Picaxe project whose PCB has spaces for plugging in either type of player.
 
-The DFPlayer Mini looks like it might be a branded version of Flyron Tech's MP3-TF-16P.
+## Theory of Operation
 
-In all cases, there seem to be clones and perhaps counterfeits.  At full retail, these can go for as much as $10, but if you shop around, you can often get them for $2 or less, especially if you're willing to buy in bulk or wait for slow shipments from China.
+Most of the datasheets provide a message reference with little information about how to use them together.  We'll start with a practical exploration of how to connect and use the module, and save the message reference for later.
 
-## Theory of Use
-
-Most of the datasheets provide a reference of the messages with little information about how to use them together.  We'll start with a practical exploration of how to connect and use the module, and save the message reference for later.
+After the message reference is documentation for the AidtopiaSerialAudio library.
 
 ### Electrical Connections
 
-#### Catalex
+The Catalex-style players are straightforward to connect to the microcontroller.
 
-#### DFPlayer Mini
+The DFPlayer Minis, as well as the ones that look like it, have some non-obvious requirements worth seom attention.
 
-##### Power
+#### Power
 
-You can power the DFPlayer Mini with a maximum of 5 volts DC.  The datasheet says the typical supply is 4.2 V.  You can insert a diode between a 5-volt supply and the VCC of the DFPlayer Mini to drop the voltage to approximately 4.3 V, which may improve the lifespan and reliability of the device.
-
-Remember to tie the grounds between the DFPlayer Mini and the microcontroller.
+You can power the DFPlayer Mini with a maximum of 5 volts DC (some datasheets say 5.2 volts).  The typical supply is 4.2 V.  You can insert a diode between a 5-volt supply and the VCC of the DFPlayer Mini to drop the voltage to approximately 4.3 V, which may improve the lifespan and reliability of the device.
 
 DFPlayer Mini actually runs at 3.3 V.  An onboard regulator adjusts the supply voltage as needed.
 
-##### Level Shifting for Serial Communication
+Remember to tie the grounds between the audio module and the microcontroller.
+
+#### Level Shifting for Serial Communication
 
 The DFPlayer Mini's serial lines use and expect only 3.3 volts.
 
@@ -62,7 +57,7 @@ When using a 5-volt microcontroller, however, you must use level shifting betwee
 
 In the opposite direction, from the chip's TX to the microcontroller's RX, a direct connection is fine.  A typical 5-volt microcontroller uses a threshold of 3.0 V to determine whether a digital input is high.  Since 3.3 V is higher than 3.0 V, the microcontroller shouldn't have a problem.
 
-##### DAC outputs
+#### DAC outputs
 
 The DFPlayer Mini provides access to the outputs of the DACs (digital-to-analog converters) for the left and right channels.
 
@@ -72,44 +67,64 @@ For an audio file at maximum volume, the DAC signals range approximately from -6
 
 When a file starts playing, the amplitude ramps up to the nominal value in about 50 ms.
 
-Do not send a DAC output directly to a GPIO pin.  Most microcontrollers require inputs to be between 0 V and the chip's operating voltage (e.g. 5 V).  The DAC outputs swing negative, which could damage the microcontroller.  You could bias the signal to ensure it's always positive and also clip it to the allowed range to make it safe for interfacing to a GPIO pin.
+Do not send a DAC output directly to a GPIO pin.  Most microcontrollers require inputs to be between 0 V and the chip's operating voltage (e.g., 5 volts for many common Arduino modules).  The DAC outputs swing negative, which could damage the microcontroller.  You could bias the signal to ensure it's always positive and also clip it to the allowed range to make it safe for interfacing to a GPIO pin.
 
-##### SPK outputs
+#### SPK Outputs
 
-There are two SPK outputs on the DFPlayer Mini.  They to _not_ correspond to the left and right audio channels.  The left and right channels are mixed down to a single channel which amplified by a low-power amplifier built into the module.  The SPK+ and SPK- signals together comprise a balanced output.
+There are two SPK outputs on the DFPlayer Mini.  They do _not_ correspond to the left and right audio channels.  The left and right channels are mixed down to mono and is amplified by a low-power amplifier built into the module.  The SPK+ and SPK- signals together comprise a balanced output.
 
 You can connect a small 8-ohm 3-watt speaker directly to the SPK pins.
 
 The SPK outputs range approximately from 0 V to 4 V.  When no sound it being played, they float at roughly the middle of their range.  When sound is being played, the SPK- output is the inverse of the SPK+.
 
-##### Optional USB Socket
+#### Optional USB Socket
+
+#### Busy
 
 ### Source Devices
 
-Other documentation often refers to the SD card source as TF, which I think stands for "True Flash."
+Most of the serial audio players can play files stored on a micro SD card (often listed as TF for True Flash).  With the Catalex-style modules, an SD card is the only option.
+
+Some modules have onboard flash memory.  These are often listed as audio recorders rather than players.  Getting data onto this flash memory is currently outside the scope of this project.
+
+Some modules may allow for a USB drive to be attached.  A USB connector may be included onboard the module, or, like the DFPlayer Mini, require an external USB connector.
+
+Some of the USB-capable modules not only allow a USB drive to be attached, but also a computer.  The the physical USB port may sometimes be considered a USB drive and sometimes an auxilliary device (AUX).  Presumably, a connection to a computer can be used to transfer data to the onboard flash memory, but that's outside the scope of this project.
+
+Some modules allow for two or more source devices.  When they power-up they will usually automatically select one of the devices to be the current device.  But it's a good idea to explicitly select the device you want before trying to play audio files from it.
 
 ### Serial Protocol
 
-The chip communicates at 9600 baud only.  If using an Arduino, you can use a hardware or software serial port.  If using the DFPlayer Mini, be sure to make the necessary level shift between the Arduino's TX output and the board's RX input.
+The serial communication is fixed at 9600 baud for all the devices I've studied.
+
+If using Arduino, you can use a hardware or software serial port.  Either way, make sure you do the necessary level shifting as described earlier.
 
 #### Message Format
+
+Serial communication with the audio player is broken into messages.  Messages may be sent to the play and received from the player.
+
+Some simple applications ignore the messages from the player altogether.
 
 | Purpose | Value | Notes |
 | :--- | :---: | :--- |
 | Start Byte | 0x7F | Indicates the beginning of a message. |
 | Version | 0xFF | Significance unknown. |
-| Length | 0x06 _typically_ | Number of message bytes, excluding Start Byte, Checksum, and End Byte.  The length is 0x06 for most messages, but it can be higher for Command 0x21, which can set a playlist. |
-| Msg ID | _varies_ | The following tables describe the meaning of the various message ID values. |
-| Feedback | 0x00 _or_ 0x01 | Use 0x01 to request a response to this message. |
-| Param Hi | _varies_ | High byte of the 16-bit parameter value used by some commands.  Commands that don't use the parameter should pass 0. |
-| Param Lo | _varies_ | Low byte of the 16-bit parameter value used by some commands.  Commands that don't use the parameter should pass 0. |
-| Chksum Hi | _varies_ | High byte of the _optional_ 16-bit checksum. |
-| Chksum Lo | _varies_ | Low byte of the _optional_ 16-bit checksum. |
+| Length | 0x06 (typically) | Number of message bytes, excluding Start Byte, Checksum, and End Byte.  The length is 0x06 for most messages, but it can be higher for Command 0x21, which can set a playlist. |
+| Msg ID | (varies) | The following tables describe the meaning of the various message ID values. |
+| Feedback | 0x00 _or_ 0x01 | Use 0x01 to request an acknowledgement of this message. |
+| Param Hi | (varies) | High byte of the 16-bit parameter value used by some commands.  Commands that don't use the parameter should pass 0. |
+| Param Lo | (varies) | Low byte of the 16-bit parameter value used by some commands.  Commands that don't use the parameter should pass 0. |
+| Chksum Hi | (varies) | High byte of the _optional_ 16-bit checksum. |
+| Chksum Lo | (varies) | Low byte of the _optional_ 16-bit checksum. |
 | End Byte | 0xEF | Indicates the end of a message.  Note that it's almost impossible for Chksum Hi to be 0xEF, which is how a receiver can tell whether the message includes a checksum. |
 
-Note that, instead of Param Hi and Param Lo, the Playlist command includes a list of one or more parameter bytes.  This is the one known case where Length will be something other than 0x06.
+Note that, instead of Param Hi and Param Lo, the Playlist command includes a list of one or more parameter bytes.  This is the one case where Length may be something other than 0x06.
 
 The Feedback flag essentially requests that the module respond with an ACK message if the command is received.  The ACK doesn't necessarily mean the command was accepted or executed.  It simply means the message was received.
+
+Messages sent to the player may optionally include the checksum.  If the checksum is present, both bytes are required, and the player will return a Bad Checksum message if the checksum is incorrect.
+
+Messages from the player always include a checksum, but the controller may choose to ignore them.  Checksums are not essential when the controller and the player are in near proximity.  When communicating over a longer line that may be subject to electrical noise, checksums can be a good way to ensure reliable transmission.
 
 The checksum is the two's complement of the 16-bit sum of the data bytes excluding the start byte, the end byte, and the checksum itself.  Since most (all?) microcontrollers use two's complement internally code samples usually compute this as:
 
@@ -209,8 +224,36 @@ A better way to save a few milliamps is to disable the DAC (0x1A,1), which drops
 
 ### ACKs and Errors
 
+When a message is sent to the module with the feedback flag set, the module will acknowledge it by sending back an ACK message.  This simply means the message was received.  It's purpose is to ensure the communication channel is functioning correctly.
+
+The parameter in the ACK message is undefined.  Some implementations seem to re-use the message buffer, so there may seem to be data in the parameter that appears meaningful, but it isn't.
+
+If an error occurs while executing a command, the module will send a separate message to indicate the error, and this message will arrive after the ACK.
+
+When sending commands, using feedback might be useful.  When sending queries, requesting feedback is unnecessary because the module should send a response or an error, making an extra ACK superfluous.
+
+| Msg ID | Value | Parameter | Notes |
+| :--- | :---: | :--- | :--- |
+| Error | 0x40 | See error below | Sent by the module to report a problem. |
+| ACK  | 0x41 | undefined | Sent by the module after receiving a message with the feedback flag set. |
+
+| Error | Code | Meaning |
+| :--- | :--- | :--- |
+| Unsupported | 0x00 | The command or query received is not supported. |
+| No sources | 0x01 | No storage device is selected. They module may still be initializing after a power-up or reset. |
+| Sleeping | 0x02 | The module is sleeping.  See the Sleep and Wake commands for more information. |
+| Serial Error | 0x03 | The message was not received because of an error with the serial communication.  Possible causes include incorrect baud rate, wrong message format, poor electrical connections, etc. |
+| Bad Checksum | 0x04 | The checksum was incorrect, so the message was rejected. |
+| File Out of Range | 0x05 | A file index parameter was higher than the number of files on the storage device. |
+| Track Not Found | 0x06 | The specified track number (or folder number) was not found on the storage device. |
+| Insertion Error | 0x07 | The advertisement track could not be played.  This can happen if the player is stopped, an advertisement is already playing, or the requested advertisement track was not found. |
+| SD/TF Card Error | 0x08 | The module encountered a problem communicating with the Micro SD (True Flash) card. |
+
+Note that the AidtopiaSerialAudio library reports a timeout as though it received an error message with the error code 0x100.
 
 ### Commands
+
+Here are the commands that can be sent by the application to the serial audio player.  Note that different players support different subsets of these.
 
 | Msg ID | Value | Parameter | Notes |
 | :--- | :---: | :--- | :--- |
@@ -243,7 +286,7 @@ A better way to save a few milliamps is to disable the DAC (0x1A,1), which drops
 | DAC Enable/Disable | 0x1A | 0: enable<br>1: disable | Enables or disables the DACs (digital to audio converters) which are the audio outputs from the module.  The DACs drive the headphone jack but also the small on-board amplifier for direct speaker connection.  Presumably disabling them when not necessary saves power. |
 | Playlist? | 0x21 | series of byte-sized file indexes | TODO:  Learn more.  Note: Only command with a length that's not 0x06. Doesn't seem to work reliably.  Translations call this "combined play." |
 | Play With Volume | 0x22 | High: _volume_<br>Low: _file index_ | Plays the specified file at the new volume. |
-| Insert From "ADVERT_n_" Folder | 0x25 | High: _folder_ 1~9<br>Low: _track_ (0~255) | Allows inserting a track from any of 9 additional advertisement folders into the currently playing track. |
+| Insert From "ADVERT*n*" Folder | 0x25 | High: _folder_ [1..9]<br>Low: _track_ [0..255] | Inserting an advertisement track from a top-level folder named "ADVERT*n*", where *n* is a digit from 1 to 9. |
 
 ### Asynchronous Messages
 
@@ -256,7 +299,9 @@ The player sends notifications of events asynchronously.
 | Finished USB File | 0x3C | _file index_ | A file on the USB drive has just finished playing. |
 | Finished SD File | 0x3D | _file index_  | A file on the SD card has just finished playing. This notification is not sent for an advertisement has been "inserted". |
 | Finished Flash File | 0x3E | _file index_ | A file in the Flash memory has just finished playing. |
-| Initialization Completed | 0x3F | _devices_ | This notification is sent after powering on or resetting.  The parameter is a bitmap of the storage devices that are online.  Some models will supposedly also this as a query of the current online devices. |
+| Initialization Completed | 0x3F | _devices_ | This notification is sent after powering on or resetting.  The parameter is a bitmap of the storage devices that are online. |
+
+Some datasheets claim the Initialization Completed message (0x3F) can also be used as query.
 
 ### Queries
 
@@ -264,7 +309,7 @@ Responses to queries use the same message format as the queries themselves.  For
 
 | Msg ID | Value | Query | Response | Notes |
 | :--- | :---: | :--- | :--- | :--- |
-| Status | 0x42 | 0 | High: _device_<br>Low: _state_ | |
+| Status | 0x42 | 0 | High: _device_<br>Low: _state_ | Indicates the currently selected storage device (e.g., the SD card) and the state (e.g., Playing, Paused, Stopped) |
 | Volume | 0x43 | 0 | _volume_ | Returns the current volume level, 0-30. |
 | Equalizer | 0x44 | 0 | 0: Normal<br>1: Pop<br>2: Rock<br>3: Jazz<br>4: Classical<br>5: Bass | |
 | Playback Sequence | 0x45 | 0 | 0: Loop All<br>1: Loop Folder<br>2: Loop Track<br>3: Random<br>4: Single | Indicates which sequencing mode the player is currently in. (Catalex reports Loop All upon startup, but will show the correct value when selected.) |
@@ -276,16 +321,28 @@ Responses to queries use the same message format as the queries themselves.  For
 | SD Card Current File | 0x4C | 0 | _file index_ | Returns the index of the current file for the USB drive. |
 | Flash Current File | 0x4D | 0 | _file index_ | Returns the index of the current file for the USB drive. (Catalex returns 256.) |
 | Folder Track Count | 0x4E | _folder_ | _count_ | Query specifies a folder number that corresponds to a folder with a two-decimal digit name like "01" or "13".  Response returns the number of audio files in that folder. |
-| Folder Count | 0x4F | 0 | _count_ | Returns the number of folders under the root folder.  Includes numbered folders like "01", the "MP3" folder if there is one, and the "ADVERT" folder if there is one. |
+| Folder Count | 0x4F | 0 | _count_ | Returns the total number of folders under the root folder.  Includes numbered folders like "01", the "MP3" folder, and the "ADVERT" and "ADVERT*n*" folders. |
 | Flash Current Folder | 0x61 | 0 | _folder_ | Returns the number of the current folder on the flash memory. |
 
 Queries have a natural response or an error, so it's generally not necessary to set the feedback bit in query messages.  If you do set the feedback bit, you will typically receive an ACK message immediately after the response, and the ACK's parameter will repeat the parameter from the response.
 
 ## Aidtopia Serial Audio Library for Arduino
 
+## Modules Tested
+
+* DFPlayer Mini with AA1044HER406-94
+
+Notes on model numbers:
+
+The players often end with a suffix like -16P.  I believe the 16 means it uses 16-bit DACs, and the P means it's a player, that is, it's a module with some support circuitry and not the raw chip.
+
+The chip numbers end with a suffix like -24SS.  I believe the 24 means it has 24-bit DACs.  The SS may indicate serial interface and stereo output.
+
+The manufacturer of the YX chips (with numbers like YX5100, YX5200, YX6200, YX6300) appears to be yx080.com.  The YX chips seem to define this space, and other chip makers try to offer drop-in compatible versions.
+
 ## References
 
-[Chinese datasheet](https://github.com/0xcafed00d/yx5300/blob/master/docs/YX5300-24SS%20DEBUG%20manual%20V1.0.pdf)  Includes the 0x21 playlist(?) command, which is not necessarily of length 0x06.  Also includes the mysterious 0x61 command, which may have to do with programming the internal FLASH memory.
+[Chinese datasheet](https://github.com/0xcafed00d/yx5300/blob/master/docs/YX5300-24SS%20DEBUG%20manual%20V1.0.pdf)  Includes the 0x21 playlist(?) command (which is not necessarily of length 0x06), and Current Flash Folder 0x61 query.
 
 [A better, more complete translation of the datasheet]( http://www.flyrontech.com/uploadfile/download/20184121510393726.pdf)  Best description of commands, queries, and "ADVERT" feature.
 

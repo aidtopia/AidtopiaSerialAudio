@@ -82,6 +82,14 @@ void Aidtopia_SerialAudio::insertAdvert(uint16_t track) {
   sendCommand(MID_INSERTADVERT, track);
 }
 
+void Aidtopia_SerialAudio::insertAdvert(uint8_t folder, uint8_t track) {
+  if (1 <= folder && folder <= 9) {
+    sendCommand(MID_INSERTADVERTN, combine(folder, track));
+  } else if (folder == 0) {
+    sendCommand(MID_INSERTADVERT, track);
+  }
+}
+
 void Aidtopia_SerialAudio::stopAdvert() {
   sendCommand(MID_STOPADVERT);
 }
@@ -171,7 +179,6 @@ void Aidtopia_SerialAudio::queryPlaybackSequence() {
 void Aidtopia_SerialAudio::queryFirmwareVersion() {
   sendQuery(MID_FIRMWAREVERSION);
 }
-
 
 
 Aidtopia_SerialAudio::Message::Message() :
