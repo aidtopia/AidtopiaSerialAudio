@@ -109,6 +109,8 @@ The chip communicates at 9600 baud only.  If using an Arduino, you can use a har
 
 Note that, instead of Param Hi and Param Lo, the Playlist command includes a list of one or more parameter bytes.  This is the one known case where Length will be something other than 0x06.
 
+The Feedback flag essentially requests that the module respond with an ACK message if the command is received.  The ACK doesn't necessarily mean the command was accepted or executed.  It simply means the message was received.
+
 The checksum is the two's complement of the 16-bit sum of the data bytes excluding the start byte, the end byte, and the checksum itself.  Since most (all?) microcontrollers use two's complement internally code samples usually compute this as:
 
 ```C++
@@ -205,6 +207,9 @@ A better way to save a few milliamps is to disable the DAC (0x1A,1), which drops
 
 ## Message Reference
 
+### ACKs and Errors
+
+
 ### Commands
 
 | Msg ID | Value | Parameter | Notes |
@@ -218,14 +223,14 @@ A better way to save a few milliamps is to disable the DAC (0x1A,1), which drops
 | Select EQ | 0x07 | 0: Normal<br>1: Pop<br>2: Rock<br>3: Jazz<br>4: Classical<br>5: Bass | On DFPlayer Mini, changing the EQ interrupts the current track. On Catalex, it doesn't. |
 | Loop File | 0x08 | High: 0<br>Low: _file index_ | This command loops file index.  High byte must be zero to distinguish this from Loop Flash Track. |
 | Loop Flash Track | 0x08 | High: _flash folder_<br>Low: _track_ | The high byte determines a folder in the flash memory source device and the low byte selects the track. |
-| Select Source Device | 0x09 | 0: USB drive<br>1: SD card<br>2: AUX<br>3: Sleep?<br>4: Flash | When multiple sources are available, this command lets you select one as the "current" source.  AUX and FLASH are not readily available on most modules.  In theory, you can connect a USB drive. TBD:  Understand why Sleep is an option here and how it interacts with other sleep and wake commands. |
+| Select Source Device | 0x09 | 1: USB drive<br>2: SD card<br>4: Flash | When multiple sources are available, this command lets you select one as the "current" source.  AUX and FLASH are not readily available on most modules. |
 | Sleep | 0x0A | 0 | Seems pointless. |
-| Wake | 0x0B | 0 | Often not supported. |
+| Wake | 0x0B | 0 | If not supported, try Reset or Select Source Device. |
 | Reset | 0x0C | 0 | Re-initializes the module with defaults.  Initialization is not instantaneous, and it typically causes the module to send a bitmask of which sources are available. |
 | Resume<br>("unpause")| 0x0D | 0 | Resume playing (typically sent when playback is paused). Can also be used 100 ms after a track finishes playing in order to play the next track. |
 | Pause | 0x0E | 0 | |
 | Play From Folder | 0x0F | High: _folder number_<br>Low: _track number_ | Unlike Play File Number, this selects the folder by converting the high byte of the parameter into a two-decimal-digit string.  For example, folder 0x05 means "05" and folder 0x0A means "10".  Likewise the track number is matched against the file name that begins with a three or four digit representation of the value in the low byte of the parameter.  For example, 0x1A will match a file with a name like "026 Yankee Doodle.wav". |
-| Volume Adjust | 0x10 | High: _enable_<br>Low: _gain_ | This command is rejected by the modules I have. |
+| Amplifier | 0x10 | High: _enable_<br>Low: _gain_ | Enable/disable the amplifier and set the gain level.  This is independent from the volume.  Not supported by most modules. |
 | Loop All Files | 0x11 | 1: start looping<br>2: stop looping<br> | Plays all the files of the selected source device, repeatedly. |
 | Play From "MP3" Folder | 0x12 | _track_ | Like Play From Folder, but the folder name must be "MP3" and the track number can use the full 16-bits.  For speed, it's recommended that track numbers don't exceed 3000 (0x0BB8). Doesn't work on Catalex. |
 | Insert From "ADVERT" Folder | 0x13 | _track_ | Interrupts the currently playing track and plays the selected track from a folder named "ADVERT".  When the inserted track completes, the interrupted track immediately resumes from where it left off.  There is no message sent when the inserted track completes, though, on the DFPlayer Mini, you could watch for the brief blink on the BUSY line.  Documentation seems to suggest that this be used to interrupt tracks from the MP3 folder, but it works regardless of where the original track is located.  For speed, it's recommended that track numbers don't exceed 3000.  If you try to insert when nothing is playing (stopped or paused), you'll get an insertion error. Doesn't work on Catalex. |
@@ -238,10 +243,20 @@ A better way to save a few milliamps is to disable the DAC (0x1A,1), which drops
 | DAC Enable/Disable | 0x1A | 0: enable<br>1: disable | Enables or disables the DACs (digital to audio converters) which are the audio outputs from the module.  The DACs drive the headphone jack but also the small on-board amplifier for direct speaker connection.  Presumably disabling them when not necessary saves power. |
 | Playlist? | 0x21 | series of byte-sized file indexes | TODO:  Learn more.  Note: Only command with a length that's not 0x06. Doesn't seem to work reliably.  Translations call this "combined play." |
 | Play With Volume | 0x22 | High: _volume_<br>Low: _file index_ | Plays the specified file at the new volume. |
-
-### ACKs and Errors
+| Insert From "ADVERT_n_" Folder | 0x25 | High: _folder_ 1~9<br>Low: _track_ (0~255) | Allows inserting a track from any of 9 additional advertisement folders into the currently playing track. |
 
 ### Asynchronous Messages
+
+The player sends notifications of events asynchronously.
+
+| Msg ID | Value | Parameter | Notes |
+| :--- | :---: | :--- | :--- |
+| Device Inserted | 0x3A | _device_ | A storage device has been connected to the player. |
+| Device Removed  | 0x3B | _device_ | A storage device has been disconnected from the player. |
+| Finished USB File | 0x3C | _file index_ | A file on the USB drive has just finished playing. |
+| Finished SD File | 0x3D | _file index_  | A file on the SD card has just finished playing. This notification is not sent for an advertisement has been "inserted". |
+| Finished Flash File | 0x3E | _file index_ | A file in the Flash memory has just finished playing. |
+| Initialization Completed | 0x3F | _devices_ | This notification is sent after powering on or resetting.  The parameter is a bitmap of the storage devices that are online.  Some models will supposedly also this as a query of the current online devices. |
 
 ### Queries
 
@@ -250,7 +265,7 @@ Responses to queries use the same message format as the queries themselves.  For
 | Msg ID | Value | Query | Response | Notes |
 | :--- | :---: | :--- | :--- | :--- |
 | Status | 0x42 | 0 | High: _device_<br>Low: _state_ | |
-| Volume | 0x43 | 0 | _volume_ | Returns the current volume level, 0-30.  (Possibly wrong on Catalex.) |
+| Volume | 0x43 | 0 | _volume_ | Returns the current volume level, 0-30. |
 | Equalizer | 0x44 | 0 | 0: Normal<br>1: Pop<br>2: Rock<br>3: Jazz<br>4: Classical<br>5: Bass | |
 | Playback Sequence | 0x45 | 0 | 0: Loop All<br>1: Loop Folder<br>2: Loop Track<br>3: Random<br>4: Single | Indicates which sequencing mode the player is currently in. (Catalex reports Loop All upon startup, but will show the correct value when selected.) |
 | Firmware Version | 0x46 | 0 | _version_ | DFPlayer Mini: 8.  Catalex: no response |
@@ -262,10 +277,11 @@ Responses to queries use the same message format as the queries themselves.  For
 | Flash Current File | 0x4D | 0 | _file index_ | Returns the index of the current file for the USB drive. (Catalex returns 256.) |
 | Folder Track Count | 0x4E | _folder_ | _count_ | Query specifies a folder number that corresponds to a folder with a two-decimal digit name like "01" or "13".  Response returns the number of audio files in that folder. |
 | Folder Count | 0x4F | 0 | _count_ | Returns the number of folders under the root folder.  Includes numbered folders like "01", the "MP3" folder if there is one, and the "ADVERT" folder if there is one. |
+| Flash Current Folder | 0x61 | 0 | _folder_ | Returns the number of the current folder on the flash memory. |
 
 Queries have a natural response or an error, so it's generally not necessary to set the feedback bit in query messages.  If you do set the feedback bit, you will typically receive an ACK message immediately after the response, and the ACK's parameter will repeat the parameter from the response.
 
-## Aidtopia YX5300 Library for Arduino
+## Aidtopia Serial Audio Library for Arduino
 
 ## References
 
@@ -279,4 +295,4 @@ Queries have a natural response or an error, so it's generally not necessary to 
 
 [Garry's Blog](https://garrysblog.com/2022/06/12/mp3-dfplayer-notes-clones-noise-speakers-wrong-file-plays-and-no-library/) notes the variety of versions of just the DFPlayer Mini.
 
-[DFPlayer Analyzer] https://github.com/ghmartin77/DFPlayerAnalyzer is a project that helps to uncover the quirks of your particular module.
+[DFPlayer Analyzer](https://github.com/ghmartin77/DFPlayerAnalyzer) is a project that helps to uncover the quirks of your particular module.

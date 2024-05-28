@@ -30,8 +30,8 @@ class Aidtopia_SerialAudio {
     enum Device : uint8_t {
       DEV_USB       = 0x01,  // a storage device connected via USB
       DEV_SDCARD    = 0x02,  // a micro SD card in the TF slot
-      DEV_AUX       = 0x04,  // typically a connection to a PC
-      DEV_FLASH     = 0x08,  // internal (or onboard) flash memory
+      DEV_FLASH     = 0x04,  // internal (or onboard) flash memory
+      DEV_AUX       = 0x08,  // typically a connection to a PC
       DEV_SLEEP     = 0x10,  // a pseudo-device to indicate the module is asleep
       // Synonyms used in the datasheets:
       DEV_TF  = DEV_SDCARD, // The SD card slot is sometimes called TF (True Flash)
