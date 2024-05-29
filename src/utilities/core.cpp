@@ -3,57 +3,69 @@
 
 namespace aidtopia {
 
-void SerialAudioCore::update() {
-  checkForIncomingMessage();
-  checkForTimeout();
-}
-
-
-void SerialAudioCore::checkForIncomingMessage() {
-  while (m_stream->available() > 0) {
-    if (m_in.receive(m_stream->read())) {
-      receiveMessage(m_in);
+static void dump(MessageBuffer const &msgbuf) {
+    auto const buf = msgbuf.getBytes();
+    auto const len = msgbuf.getLength();
+    for (int i = 0; i < len; ++i) {
+        Serial.print(buf[i], HEX);
+        Serial.print(' ');
     }
-  }
+    Serial.println();
 }
 
-void SerialAudioCore::checkForTimeout() {
-  if (m_timeout.expired()) {
-    m_timeout.cancel();
-    // onError(EC_TIMEDOUT);
-  }
+bool SerialAudioCore::checkForIncomingMessage() {
+    while (m_stream->available() > 0) {
+        if (m_in.receive(m_stream->read())) {
+            dump(m_in);
+            if (m_in.isValid()) return true;
+        }
+    }
+    return false;
 }
 
-void SerialAudioCore::receiveMessage(const Message &msg) {
-  // onMessageReceived(msg);
-  if (!msg.isValid()) {
-      // onMessageInvalid();
-      return;
-  }
-  //callHooks(msg);
-  if (msg.getMessageID() >= MID_INITCOMPLETE) m_timeout.cancel();
+void SerialAudioCore::send(Message const &msg, Feedback feedback) {
+    m_out.set(static_cast<uint8_t>(msg.getID()), msg.getParam(), feedback);
+    const auto buf = m_out.getBytes();
+    const auto len = m_out.getLength();
+    m_stream->write(buf, len);
+    dump(m_out);
 }
 
-void SerialAudioCore::sendMessage(const Message &msg) {
-  const auto buf = msg.getBuffer();
-  const auto len = msg.getLength();
-  m_stream->write(buf, len);
-  m_timeout.set(200);
-  //onMessageSent(buf, len);
+Message SerialAudioCore::receive() const {
+    return Message(static_cast<Message::ID>(m_in.getID()), m_in.getData());
 }
 
-void SerialAudioCore::sendCommand(
-    MsgID msgid,
+
+void SerialAudioTransaction::update() {
+    if (m_core.checkForIncomingMessage()) {
+        auto const msg = m_core.receive();
+        if (static_cast<uint8_t>(msg.getID()) >= static_cast<uint8_t>(Message::ID::INITCOMPLETE)) {
+            m_timeout.cancel();
+        }
+        //callHooks(msg);
+    }
+    checkForTimeout();
+}
+
+void SerialAudioTransaction::sendCommand(
+    Message::ID msgid,
     uint16_t param,
-    Message::Feedback feedback
+    Feedback feedback
 ) {
-  m_out.set(static_cast<uint8_t>(msgid), param, feedback);
-  sendMessage(m_out);
+    m_core.send(Message(msgid, param), feedback);
+    m_timeout.set(200);
 }
 
-void SerialAudioCore::sendQuery(MsgID msgid, uint16_t param) {
-  // Since queries naturally have a response, we won't ask for feedback.
-  sendCommand(msgid, param, Message::NO_FEEDBACK);
+void SerialAudioTransaction::sendQuery(Message::ID msgid, uint16_t param) {
+    // Since queries naturally have a response, we won't ask for feedback.
+    sendCommand(msgid, param, Feedback::NO_FEEDBACK);
+}
+
+void SerialAudioTransaction::checkForTimeout() {
+    if (m_timeout.expired()) {
+        m_timeout.cancel();
+        // onError(EC_TIMEDOUT);
+    }
 }
 
 }

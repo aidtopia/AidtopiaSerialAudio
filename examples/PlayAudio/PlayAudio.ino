@@ -1,6 +1,9 @@
 #include <AidtopiaSerialAudio.h>
 
-static Aidtopia_SerialAudioWithLogging audio;  // logs to Serial
+using namespace aidtopia;
+
+//static Aidtopia_SerialAudioWithLogging audio;  // logs to Serial
+static SerialAudioTransaction audio;
 
 static constexpr int hexValue(char ch) {
   return ('0' <= ch && ch <= '9') ? ch - '0' :
@@ -19,7 +22,7 @@ void setup() {
 
   // Select full logging detail before calling begin in order to see the
   // messages exchanged during initialization.
-  audio.logDetail();
+  //audio.logDetail();
 
   // Initialize the audio module connected to Serial1.  If you don't have
   // a hardware serial port available, you can use SoftwareSerial.  You do
@@ -34,6 +37,11 @@ static uint8_t cmd = 0x00;
 static uint16_t param = 0x0000;
 static bool feedback = true;
 static int state = 0;
+
+void sendIt(uint8_t msgid, uint16_t param, bool feedback) {
+  Serial.println(F("--"));
+  audio.sendCommand(static_cast<Message::ID>(msgid), param, feedback ? Feedback::FEEDBACK : Feedback::NO_FEEDBACK);
+}
 
 void loop() {
   audio.update();
@@ -58,7 +66,7 @@ void loop() {
           cmd |= hexValue(ch);
           state = 2;
         } else if (ch == '\n') {
-          audio.sendCommand(static_cast<Aidtopia_SerialAudio::MsgID>(cmd), param, feedback);
+          sendIt(cmd, param, feedback);
           state = 0;
         } else if (ch == 'x' || ch == 'X') {
           feedback = false;
@@ -69,7 +77,7 @@ void loop() {
         break;
       case 2:
         if (ch == '\n') {
-          audio.sendCommand(static_cast<Aidtopia_SerialAudio::MsgID>(cmd), param, feedback);
+          sendIt(cmd, param, feedback);
           state = 0;
         } else if (ch == 'x' || ch == 'X') {
           feedback = false;
@@ -83,7 +91,7 @@ void loop() {
           param = hexValue(ch);
           state = 4;
         } else if (ch == '\n') {
-          audio.sendCommand(static_cast<Aidtopia_SerialAudio::MsgID>(cmd), param, feedback);
+          sendIt(cmd, param, feedback);
           state = 0;
         } else if (ch == 'x' || ch == 'X') {
           feedback = false;
@@ -97,7 +105,7 @@ void loop() {
           param <<= 4;
           param |= hexValue(ch);
         } else if (ch == '\n') {
-          audio.sendCommand(static_cast<Aidtopia_SerialAudio::MsgID>(cmd), param, feedback);
+          sendIt(cmd, param, feedback);
           state = 0;
         } else if (ch == 'x' || ch == 'X') {
           feedback = false;
@@ -110,7 +118,7 @@ void loop() {
         if (ch == 'x' || ch == 'X') {
           feedback = false;
         } else if (ch == '\n') {
-          audio.sendCommand(static_cast<Aidtopia_SerialAudio::MsgID>(cmd), param, feedback);
+          sendIt(cmd, param, feedback);
           state = 0;
         } else {
           state = (ch == ' ') ? 5 : 999;

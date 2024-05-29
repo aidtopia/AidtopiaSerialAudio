@@ -288,7 +288,7 @@ Here are the commands that can be sent by the application to the serial audio pl
 | Play With Volume | 0x22 | High: _volume_<br>Low: _file index_ | Plays the specified file at the new volume. |
 | Insert From "ADVERT*n*" Folder | 0x25 | High: _folder_ [1..9]<br>Low: _track_ [0..255] | Inserting an advertisement track from a top-level folder named "ADVERT*n*", where *n* is a digit from 1 to 9. |
 
-### Asynchronous Messages
+### Asynchronous Notifications
 
 The player sends notifications of events asynchronously.
 

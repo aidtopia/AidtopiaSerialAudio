@@ -1,17 +1,17 @@
 #include <Arduino.h>
-#include <utilities/message.h>
+#include <utilities/messagebuffer.h>
 
 namespace aidtopia {
 
-Message::Message() :
-    m_buf{START, VERSION, LENGTH, 0, FEEDBACK, 0, 0, 0, 0, END},
+MessageBuffer::MessageBuffer() :
+    m_buf{START, VERSION, LENGTH, 0, 0, 0, 0, 0, 0, END},
     m_length(0) {}
 
-void Message::set(uint8_t msgid, uint16_t param, Feedback feedback) {
+void MessageBuffer::set(uint8_t msgid, uint16_t param, Feedback feedback) {
     // Note that we're filling in just the bytes that change.  We rely
     // on the framing bytes set when the buffer was first initialized.
     m_buf[3] = msgid;
-    m_buf[4] = feedback;
+    m_buf[4] = static_cast<uint8_t>(feedback);
     m_buf[5] = (param >> 8) & 0xFF;
     m_buf[6] = (param     ) & 0xFF;
     auto const checksum = ~sum() + 1u;
@@ -20,22 +20,20 @@ void Message::set(uint8_t msgid, uint16_t param, Feedback feedback) {
     m_length = 10;
 }
 
-uint8_t const *Message::getBuffer() const { return m_buf; }
-uint8_t Message::getLength() const { return m_length; }
+uint8_t const *MessageBuffer::getBytes() const { return m_buf; }
+uint8_t MessageBuffer::getLength() const { return m_length; }
 
-bool Message::isValid() const {
+bool MessageBuffer::isValid() const {
     if (m_length == 8 && m_buf[7] == END) return true;
     if (m_length != 10) return false;
     auto const checksum = combine(m_buf[7], m_buf[8]);
     return sum() + checksum == 0;
 }
 
-uint8_t Message::getMessageID() const { return m_buf[3]; }
-uint8_t Message::getParamHi() const   { return m_buf[5]; }
-uint8_t Message::getParamLo() const   { return m_buf[6]; }
-uint16_t Message::getParam() const { return combine(m_buf[5], m_buf[6]); }
+uint8_t  MessageBuffer::getID()   const { return m_buf[3]; }
+uint16_t MessageBuffer::getData() const { return combine(m_buf[5], m_buf[6]); }
 
-bool Message::receive(uint8_t b) {
+bool MessageBuffer::receive(uint8_t b) {
     switch (m_length) {
         default:
             // `m_length` is out of bounds, so start fresh.
@@ -59,7 +57,7 @@ bool Message::receive(uint8_t b) {
     }
 }
 
-uint16_t Message::sum() const {
+uint16_t MessageBuffer::sum() const {
     uint16_t s = 0;
     for (int i = 1; i <= LENGTH; ++i) s += m_buf[i];
     return s;
