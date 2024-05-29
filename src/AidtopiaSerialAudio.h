@@ -7,7 +7,10 @@
 #ifndef AIDTOPIASERIALAUDIO_H
 #define AIDTOPIASERIALAUDIO_H
 
+#include <utilities/core.h>
 #include <utilities/timeout.h>
+
+namespace aidtopia {
 
 class Aidtopia_SerialAudio {
   public:
@@ -522,5 +525,10 @@ class Aidtopia_SerialAudioWithLogging : public Aidtopia_SerialAudio {
   private:
     bool m_detailed = false;
 };
+
+}
+
+using aidtopia::Aidtopia_SerialAudio;
+using aidtopia::Aidtopia_SerialAudioWithLogging;
 
 #endif

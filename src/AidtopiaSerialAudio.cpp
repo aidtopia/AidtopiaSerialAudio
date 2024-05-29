@@ -4,13 +4,6 @@
 #include <Arduino.h>
 #include <AidtopiaSerialAudio.h>
 
-static constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
-  return static_cast<uint16_t>(hi << 8) | lo;
-}
-static constexpr uint8_t high(uint16_t x) { return x >> 8; }
-static constexpr uint8_t low(uint16_t x)  { return x & 0xFF; }
-
-
 Aidtopia_SerialAudio::Aidtopia_SerialAudio() :
   m_stream(nullptr), m_in(), m_out(), m_state(nullptr), m_timeout() {}
 
@@ -291,23 +284,21 @@ void Aidtopia_SerialAudio::checkForTimeout() {
     m_timeout.cancel();
     onError(EC_TIMEDOUT);
     if (m_state) {
-      setState(m_state->onEvent(this, MID_ERROR, high(EC_TIMEDOUT), low(EC_TIMEDOUT)));
+      setState(m_state->onEvent(this, MID_ERROR, MSB(EC_TIMEDOUT), LSB(EC_TIMEDOUT)));
     }
   }
 }
 
 void Aidtopia_SerialAudio::receiveMessage(const Message &msg) {
+  onMessageReceived(msg);
+  if (!msg.isValid()) return onMessageInvalid();
   callHooks(msg);
-  if (!msg.isValid()) return;
   if (msg.getMessageID() >= MID_INITCOMPLETE) m_timeout.cancel();
   if (!m_state) return;
   setState(m_state->onEvent(this, msg.getMessageID(), msg.getParamHi(), msg.getParamLo()));
 }
 
 void Aidtopia_SerialAudio::callHooks(const Message &msg) {
-  onMessageReceived(msg);
-  if (!msg.isValid()) return onMessageInvalid();
-
   switch (msg.getMessageID()) {
     // Asynchronous messages
     case 0x3A: {

@@ -1,8 +1,6 @@
 #ifndef AIDTOPIATIMEOUT_H
 #define AIDTOPIATIMEOUT_H
 
-#include <Arduino.h>
-
 struct MillisClock { static decltype(millis()) now() { return millis(); } };
 struct MicrosClock { static decltype(micros()) now() { return micros(); } };
 
