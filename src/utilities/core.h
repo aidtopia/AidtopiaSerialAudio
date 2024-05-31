@@ -16,41 +16,50 @@ class SerialAudioCore {
             m_stream = &serial;
         }
 
+        // If a new message is available, update copies it to msg and returns
+        // true.  Otherwise returns false.
+        bool update(Message *msg = nullptr);
+
+        void send(Message const &msg, Feedback feedback);
+
+    private:
         // Returns true if a complete and valid message has been received.
         bool checkForIncomingMessage();
 
-        void    send(Message const &msg, Feedback feedback);
-        Message receive() const;
-
-    private:
         Stream        *m_stream;
         MessageBuffer  m_in;
         MessageBuffer  m_out;
 };
 
-// SerialAudioTransaction uses SerialAudioCore to provide reliable exchange of
-// commands, queries, and responses.
-class SerialAudioTransaction {
+class SerialAudioManager {
     public:
         template <typename SerialType>
         void begin(SerialType &stream) {
-            m_core.begin(stream, 9600);
+            m_core.begin(stream);
+            
+            // begin is usually called right after power-up, so we'll assume the
+            // audio module also just powered up.
+            m_state = State::WAITFORINIT;
+            m_timeout.set(5000);
         }
-
+        
         void update();
 
-        void sendCommand(
-            Message::ID msgid,
-            uint16_t    param = 0,
-            Feedback    feedback = Feedback::FEEDBACK
-        );
+    // These will become private.
+        void sendCommand(Message::ID msgid, uint16_t param = 0);
         void sendQuery(Message::ID msgid, uint16_t param = 0);
 
     private:
-        void checkForTimeout();
+        void onEvent(Message const &msg);
 
-        SerialAudioCore m_core;
-        Timeout<MillisClock> m_timeout;
+        SerialAudioCore         m_core;
+        Timeout<MillisClock>    m_timeout;
+        enum class State {
+            WAITFORINIT,
+            WAITFORSTATUS,
+            READY,
+            STUCK
+        }                       m_state = State::WAITFORINIT;
 };
 
 }

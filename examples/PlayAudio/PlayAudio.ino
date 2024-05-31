@@ -2,8 +2,7 @@
 
 using namespace aidtopia;
 
-//static Aidtopia_SerialAudioWithLogging audio;  // logs to Serial
-static SerialAudioTransaction audio;
+static SerialAudioManager audio;
 
 static constexpr int hexValue(char ch) {
   return ('0' <= ch && ch <= '9') ? ch - '0' :
@@ -40,7 +39,7 @@ static int state = 0;
 
 void sendIt(uint8_t msgid, uint16_t param, bool feedback) {
   Serial.println(F("--"));
-  audio.sendCommand(static_cast<Message::ID>(msgid), param, feedback ? Feedback::FEEDBACK : Feedback::NO_FEEDBACK);
+  audio.sendMessage(Message{static_cast<Message::ID>(msgid), param}, feedback ? Feedback::FEEDBACK : Feedback::NO_FEEDBACK);
 }
 
 void loop() {
