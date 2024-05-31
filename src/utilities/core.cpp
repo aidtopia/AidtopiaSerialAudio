@@ -16,6 +16,7 @@ static void dump(MessageBuffer const &msgbuf) {
 bool SerialAudioCore::checkForIncomingMessage() {
     while (m_stream->available() > 0) {
         if (m_in.receive(m_stream->read())) {
+            Serial.print(F("< "));
             dump(m_in);
             if (m_in.isValid()) return true;
         }
@@ -28,7 +29,7 @@ void SerialAudioCore::send(Message const &msg, Feedback feedback) {
     const auto buf = m_out.getBytes();
     const auto len = m_out.getLength();
     m_stream->write(buf, len);
-    dump(m_out);
+    Serial.print(F("> ")); dump(m_out);
 }
 
 
@@ -46,89 +47,140 @@ bool SerialAudioCore::update(Message *msg) {
 void SerialAudioManager::update() {
     Message msg;
     if (m_core.update(&msg)) {
-        Serial.print("received: ");
+        Serial.print(F("received: "));
         Serial.print(static_cast<int>(msg.getID()), HEX);
         Serial.print(' ');
         Serial.println(msg.getParam(), HEX);
-        if (!isAsyncEvent(msg.getID())) {
+        if (!isAsyncNotification(msg.getID())) {
             m_timeout.cancel();
         }
         onEvent(msg);
     }
     if (m_timeout.expired()) {
-        Serial.println("timeout expired");
         onEvent(Message{Message::Error::TIMEDOUT});
     }
 }
 
-void SerialAudioManager::sendMessage(Message const &msg, Feedback feedback) {
-    m_core.send(msg, feedback);
+void SerialAudioManager::playFile(uint16_t index) {
+    enqueue(Message{Message::ID::PLAYFILE, index});
 }
 
-void SerialAudioManager::sendCommand(
-    Message::ID msgid,
-    uint16_t param
-) {
-    sendMessage(Message(msgid, param), Feedback::FEEDBACK);
-    m_timeout.set(10);
+void SerialAudioManager::selectSource(Device source) {
+    auto const paramLo = static_cast<uint8_t>(source);
+    enqueue(Message{Message::ID::SELECTSOURCE, 0, paramLo});
 }
 
-void SerialAudioManager::sendQuery(Message::ID msgid, uint16_t param) {
-    // Since queries naturally have a response, we won't ask for feedback.
-    sendMessage(Message{msgid, param}, Feedback::NO_FEEDBACK);
-    m_timeout.set(20);
+void SerialAudioManager::setVolume(uint8_t volume) {
+    volume = min(volume, 30);
+    enqueue(Message{Message::ID::SETVOLUME, volume});
 }
+
+void SerialAudioManager::reset() {
+    clearQueue();
+    enqueue(Message{Message::ID::RESET});
+}
+
+void SerialAudioManager::sendMessage(Message const &msg) {
+    auto const msgid = msg.getID();
+    if (msgid == Message::ID::RESET) {
+        m_core.send(msg, Feedback::FEEDBACK);
+        m_timeout.set(3000);
+        m_expected = Message::ID::INITCOMPLETE;
+        m_state = State::INITPENDING;
+    } else if (isQuery(msgid)) {
+        m_core.send(msg, Feedback::NO_FEEDBACK);
+        m_timeout.set(100);
+        m_expected = msgid;
+        m_state = State::RESPONSEPENDING;
+    } else {
+        m_core.send(msg, Feedback::FEEDBACK);
+        m_timeout.set(33);
+        m_expected = Message::ID::ACK;
+        m_state = State::RESPONSEPENDING;
+    }
+}
+
+void SerialAudioManager::enqueue(Message const &msg) {
+    m_queue[m_tail++] = msg;
+    if (m_tail == m_head) Serial.println(F("Queue overflowed!"));
+    if (m_state == State::READY) dispatch();
+}
+
+void SerialAudioManager::clearQueue() {
+    m_head = m_tail = 0;
+}
+
+void SerialAudioManager::dispatch() {
+    if (m_head == m_tail) return;
+
+    Serial.println(F("Dispatching next queued message."));
+    sendMessage(m_queue[m_head++]);
+}
+
 
 void SerialAudioManager::onEvent(Message const &msg) {
     using ID = Message::ID;
 
-    switch (m_state) {
-        case State::WAITFORINIT:
-            // Initialization time varies depending on how many devices are
-            // attached and how many files and folders they contain.  We're
-            // not supposed to send messages to the device during initializaton.
-            // So we'll wait a while for any sign of life from the module.
-            if (msg.getID() == ID::INITCOMPLETE) {
-                Serial.println(F("Initialization completed!"));
-                m_timeout.cancel();
-                m_state = State::READY;
-            } else if (isTimeout(msg)) {
-                Serial.println(F("Timed out waiting for initialization."));
-                // Maybe the module is initialized and just quietly
-                // waiting for us.  We'll check its status.
-                sendQuery(ID::STATUS);
-                m_state = State::WAITFORSTATUS;
-            } else if (isError(msg.getID())) {
-                Serial.println(F("Error occurred while waiting for initialization."));
-                m_state = State::STUCK;
-            } else if (isAsyncEvent(msg.getID())) {
-                Serial.println(F("Async notification while waiting for init."));
-                // An asynchronous notification suggests the module is
-                // already alive and kicking.
-                m_timeout.cancel();
-                m_state = State::READY;
-            }
-            break;
-        case State::WAITFORSTATUS:
-            if (msg.getID() == ID::STATUS) {
-                Serial.println(F("Response from status query."));
-                m_timeout.cancel();
-                m_state = State::READY;
-            } else if (isTimeout(msg)) {
-                Serial.println(F("Timed out waiting for response to status query."));
-                m_timeout.cancel();
-                m_state = State::STUCK;
-            } else if (isError(msg.getID())) {
-                Serial.println(F("Error occured while waiting for status."));
-                m_timeout.cancel();
-                m_state = State::STUCK;
-            } else if (isAsyncEvent(msg.getID())) {
-                Serial.println(F("Async notificiation while waiting for status."));
-            }
-            break;
-        case State::READY: break;
-        case State::STUCK: break;
+    if (isAsyncNotification(msg.getID())) {
+        Serial.println(F("Asynchronous notification received."));
+        return;
     }
+    
+    if (msg.getID() == ID::INITCOMPLETE && m_state != State::INITPENDING) {
+        Serial.println(F("Audio device unexpectedly reset!"));
+    }
+
+    switch (m_state) {
+        case State::INITPENDING:
+            Serial.print(F("INITPENDING: "));
+            if (msg.getID() == ID::ACK) {
+                Serial.println(F("reset command ack'ed"));
+            } else if (msg.getID() == ID::INITCOMPLETE) {
+                Serial.println(F("completed"));
+                ready();
+            } else if (isTimeout(msg)) {
+                Serial.println(F("Timed out"));
+                // Maybe the module is initialized and just quietly waiting for
+                // us.  We'll check its status.
+                sendMessage(Message{ID::STATUS});
+            } else if (isError(msg.getID())) {
+                Serial.println(F("error"));
+                m_state = State::STUCK;
+            } else {
+                Serial.println(F("unexpected event"));
+            }
+            break;
+        case State::RECOVERING:
+            break;
+        case State::RESPONSEPENDING:
+            Serial.print(F("RESPONSEPENDING: "));
+            if (msg.getID() == m_expected) {
+                Serial.println(F("response received"));
+                ready();
+            } else if (isError(msg.getID())) {
+                Serial.println(F("error"));
+                m_timeout.cancel();
+                m_state = State::STUCK;
+            } else {
+                Serial.println(F("unexpected event"));
+            }
+            break;
+        case State::READY:
+            Serial.println(F("READY: "));
+            Serial.println(F("unexpected event"));
+            break;
+        case State::STUCK:
+            Serial.println(F("STUCK: "));
+            Serial.println(F("unexpected event"));
+            break;
+    }
+}
+
+void SerialAudioManager::ready() {
+    m_timeout.cancel();
+    m_expected = Message::ID::NONE;
+    m_state = State::READY;
+    dispatch();
 }
 
 }

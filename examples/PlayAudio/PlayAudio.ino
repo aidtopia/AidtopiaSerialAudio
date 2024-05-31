@@ -15,31 +15,37 @@ static constexpr bool isHexDigit(char ch) {
   return hexValue(ch) >= 0;
 }
 
+template <typename T>
+bool applyHexDigit(char ch, T &value) {
+  if (!isHexDigit(ch)) return false;
+  value <<= 4;
+  value |= hexValue(ch);
+  return true;
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println("\nAidtopia Serial Audio Test\n");
-
-  // Select full logging detail before calling begin in order to see the
-  // messages exchanged during initialization.
-  //audio.logDetail();
 
   // Initialize the audio module connected to Serial1.  If you don't have
   // a hardware serial port available, you can use SoftwareSerial.  You do
   // not have to call the serial device's begin method first.  This will
   // set the baud rate.
   audio.begin(Serial1);
+  audio.selectSource(SerialAudioManager::Device::SDCARD);
+  audio.setVolume(20);
+  audio.playFile(3);
 }
 
 // We'll let the user enter raw command numbers and parameters to explore
 // what's possible.
 static uint8_t cmd = 0x00;
 static uint16_t param = 0x0000;
-static bool feedback = true;
 static int state = 0;
 
-void sendIt(uint8_t msgid, uint16_t param, bool feedback) {
+void sendIt(uint8_t msgid, uint16_t param) {
   Serial.println(F("--"));
-  audio.sendMessage(Message{static_cast<Message::ID>(msgid), param}, feedback ? Feedback::FEEDBACK : Feedback::NO_FEEDBACK);
+  audio.enqueue(Message{static_cast<Message::ID>(msgid), param});
 }
 
 void loop() {
@@ -49,82 +55,26 @@ void loop() {
     char ch = Serial.read();
     switch (state) {
       case 0:
-        cmd = 0;
-        param = 0;
-        feedback = true;
-        if (isHexDigit(ch)) {
-          cmd = hexValue(ch);
-          state = 1;
-        } else {
-          state = (ch == ' ') ? 0 : 999;
-        }
+        cmd = 0; param = 0;
+        if (applyHexDigit(ch, cmd))   { state = 1; break; }
+        else                          { state = (ch == ' ') ? 0 : 999; break; }
         break;
       case 1:
-        if (isHexDigit(ch)) {
-          cmd <<= 4;
-          cmd |= hexValue(ch);
-          state = 2;
-        } else if (ch == '\n') {
-          sendIt(cmd, param, feedback);
-          state = 0;
-        } else if (ch == 'x' || ch == 'X') {
-          feedback = false;
-          state = 5;
-        } else {
-          state = (ch == ' ') ? 3 : 999;
-        }
-        break;
+        if (applyHexDigit(ch, cmd))   { state = 2; break; }
+        [[fallthrough]];
       case 2:
-        if (ch == '\n') {
-          sendIt(cmd, param, feedback);
-          state = 0;
-        } else if (ch == 'x' || ch == 'X') {
-          feedback = false;
-          state = 5;
-        } else {
-          state = (ch == ' ') ? 3 : 999;
-        }
+        if (ch == '\n')               { sendIt(cmd, param); state = 0; break; }
+        else                          { state = (ch == ' ') ? 3 : 999; break; }
         break;
       case 3:
-        if (isHexDigit(ch)) {
-          param = hexValue(ch);
-          state = 4;
-        } else if (ch == '\n') {
-          sendIt(cmd, param, feedback);
-          state = 0;
-        } else if (ch == 'x' || ch == 'X') {
-          feedback = false;
-          state = 5;
-        } else {
-          state = (ch == ' ') ? 5 : 999;
-        }
-        break;
+        if (applyHexDigit(ch, param)) { break; }
+        [[fallthrough]];
       case 4:
-        if (isHexDigit(ch)) {
-          param <<= 4;
-          param |= hexValue(ch);
-        } else if (ch == '\n') {
-          sendIt(cmd, param, feedback);
-          state = 0;
-        } else if (ch == 'x' || ch == 'X') {
-          feedback = false;
-          state = 5;
-        } else {
-          state = (ch == ' ') ? 5 : 999;
-        }
+        if (ch == '\n')               { sendIt(cmd, param); state = 0; break; }
+        else                          { state = (ch == ' ') ? 4 : 999; break; }
         break;
-      case 5:
-        if (ch == 'x' || ch == 'X') {
-          feedback = false;
-        } else if (ch == '\n') {
-          sendIt(cmd, param, feedback);
-          state = 0;
-        } else {
-          state = (ch == ' ') ? 5 : 999;
-        }
-        break;
-      case 999:
-        if (ch == '\n') state = 0;
+      default:
+        if (ch == '\n')               { state = 0; break; }
         break;
     }
   }

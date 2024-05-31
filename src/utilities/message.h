@@ -122,8 +122,8 @@ inline bool isCommand(Message::ID id) {
     return 0x00 < static_cast<uint8_t>(id) && static_cast<uint8_t>(id) < 0x30;
 }
 
-inline bool isAsyncEvent(Message::ID id) {
-    return 0x30 <= static_cast<uint8_t>(id) && static_cast<uint8_t>(id) < 0x40;
+inline bool isAsyncNotification(Message::ID id) {
+    return 0x30 <= static_cast<uint8_t>(id) && static_cast<uint8_t>(id) < 0x3F;
 }
 
 inline bool isAck(Message::ID id) {
@@ -135,7 +135,7 @@ inline bool isError(Message::ID id) {
 }
 
 inline bool isQuery(Message::ID id) {
-    return 0x42 < static_cast<uint8_t>(id);
+    return 0x42 <= static_cast<uint8_t>(id);
     // Supposedly Message::ID::INITCOMPLETE (0x3F) can be a query, but I've not
     // yet seen a module that supports that.
 }
@@ -145,8 +145,8 @@ inline bool isQueryResponse(Message::ID id) {
 }
 
 inline bool isTimeout(Message const &msg) {
-    return isError(msg.getID()) &&
-           static_cast<Message::Error>(msg.getParam()) == Message::Error::TIMEDOUT;
+    return msg.getID() == Message::ID::ERROR &&
+           msg.getParam() == static_cast<uint16_t>(Message::Error::TIMEDOUT);
 }
 
 }
