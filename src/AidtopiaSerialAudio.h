@@ -8,6 +8,7 @@
 #define AIDTOPIASERIALAUDIO_H
 
 #include <utilities/core.h>
+#include <utilities/manager.h>
 #include <utilities/timeout.h>
 
 namespace aidtopia {
@@ -42,7 +43,7 @@ class Aidtopia_SerialAudio {
       DEV_SPI = DEV_FLASH   // The internal flash memory is an SPI device
     };
 
-    enum Equalizer {
+    enum EqProfile {
       EQ_NORMAL,
       EQ_POP,
       EQ_ROCK,
@@ -182,7 +183,7 @@ class Aidtopia_SerialAudio {
     // Selecting an equalizer interrupts the current playback, so it's
     // best to select the EQ before starting playback.  Alternatively,
     // you can also pause, select the new EQ, and then unpause.
-    void selectEQ(Equalizer eq);
+    void selectEQ(EqProfile eq);
 
     // Sleeping doesn't seem useful.  To lower the current draw, use
     // `disableDAC`.
@@ -364,7 +365,7 @@ class Aidtopia_SerialAudio {
     virtual void onDeviceFileCount(Device device, uint16_t count);
     virtual void onDeviceInserted(Device src);
     virtual void onDeviceRemoved(Device src);
-    virtual void onEqualizer(Equalizer eq);
+    virtual void onEqualizer(EqProfile eq);
     virtual void onError(uint16_t code);
     virtual void onFinishedFile(Device device, uint16_t file_index);
     virtual void onFirmwareVersion(uint16_t version);
@@ -503,7 +504,7 @@ class Aidtopia_SerialAudioWithLogging : public Aidtopia_SerialAudio {
     void onDeviceFileCount(Device device, uint16_t count) override;
     void onDeviceInserted(Device src) override;
     void onDeviceRemoved(Device src) override;
-    void onEqualizer(Equalizer eq) override;
+    void onEqualizer(EqProfile eq) override;
     void onError(uint16_t code) override;
     void onFinishedFile(Device device, uint16_t file_index) override;
     void onFirmwareVersion(uint16_t version) override;
@@ -518,7 +519,7 @@ class Aidtopia_SerialAudioWithLogging : public Aidtopia_SerialAudio {
     void onVolume(uint8_t volume) override;
 
     void printDeviceName(Device src);
-    void printEqualizerName(Equalizer eq);
+    void printEqualizerName(EqProfile eq);
     void printModuleStateName(ModuleState state);
     void printSequenceName(Sequence seq);
 

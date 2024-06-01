@@ -21,7 +21,7 @@ class Message {
             VOLUMEUP          = 0x04,
             VOLUMEDOWN        = 0x05,
             SETVOLUME         = 0x06,
-            SELECTEQ          = 0x07,
+            SETEQPROFILE      = 0x07,
             LOOPFILE          = 0x08,
             LOOPFLASHTRACK    = LOOPFILE,  // Alternate msg not used
             SELECTSOURCE      = 0x09,
@@ -69,7 +69,7 @@ class Message {
             // Queries and their responses
             STATUS            = 0x42,
             VOLUME            = 0x43,
-            EQ                = 0x44,
+            EQPROFILE         = 0x44,
             PLAYBACKSEQUENCE  = 0x45,
             FIRMWAREVERSION   = 0x46,
             USBFILECOUNT      = 0x47,

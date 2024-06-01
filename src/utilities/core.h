@@ -42,7 +42,7 @@ class SerialAudio {
             SINGLE      = 0x04
         };
         
-        enum class Equalizer : uint8_t {
+        enum class EqProfile : uint8_t {
             NORMAL      = 0x00,
             POP         = 0x01,
             ROCK        = 0x02,
@@ -57,7 +57,7 @@ class SerialAudio {
         enum class Parameter {
             CURRENTFILE,        // I'm not sure how to implement this right now
             DEVICEFILECOUNT,    // I'm not sure how to implement this right now
-            EQUALIZER           = static_cast<uint8_t>(Message::ID::EQ),
+            EQPROFILE           = static_cast<uint8_t>(Message::ID::EQPROFILE),
             FIRMWAREVERSION     = static_cast<uint8_t>(Message::ID::FIRMWAREVERSION),
             FOLDERCOUNT,        // I'm not sure how to implement this right now
             FOLDERTRACKCOUNT,   // I'm not sure how to implement this right now
@@ -89,7 +89,7 @@ class SerialAudio {
                 // but it also makes for a much larger v-table in RAM.
                 virtual void onCurrentFile(Device device, uint16_t file_index);
                 virtual void onDeviceFileCount(Device device, uint16_t count);
-                virtual void onEqualizer(Equalizer eq);
+                virtual void onEqualizer(EqProfile eq);
                 virtual void onFirmwareVersion(uint16_t version);
                 virtual void onFolderCount(uint16_t count);
                 virtual void onFolderTrackCount(uint16_t count);

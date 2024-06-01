@@ -10,7 +10,7 @@ class SerialAudioManager : public SerialAudio {
     public:
         using SerialAudio::Device;
         using SerialAudio::ModuleState;
-        using SerialAudio::Equalizer;
+        using SerialAudio::EqProfile;
         using SerialAudio::Sequence;
         using SerialAudio::Hooks;
     

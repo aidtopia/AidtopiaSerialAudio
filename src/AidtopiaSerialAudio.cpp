@@ -111,7 +111,7 @@ void Aidtopia_SerialAudio::setVolume(int volume) {
 void Aidtopia_SerialAudio::increaseVolume() { sendCommand(MID_VOLUMEUP); }
 void Aidtopia_SerialAudio::decreaseVolume() { sendCommand(MID_VOLUMEDOWN); }
 
-void Aidtopia_SerialAudio::selectEQ(Equalizer eq) {
+void Aidtopia_SerialAudio::selectEQ(EqProfile eq) {
   sendCommand(MID_SELECTEQ, eq);
 }
 
@@ -257,7 +257,7 @@ void Aidtopia_SerialAudio::onCurrentTrack(Device /*device*/, uint16_t /*file_ind
 void Aidtopia_SerialAudio::onDeviceFileCount(Device /*device*/, uint16_t /*count*/) {};
 void Aidtopia_SerialAudio::onDeviceInserted(Device /*src*/) {};
 void Aidtopia_SerialAudio::onDeviceRemoved(Device /*src*/) {};
-void Aidtopia_SerialAudio::onEqualizer(Equalizer /*eq*/) {};
+void Aidtopia_SerialAudio::onEqualizer(EqProfile /*eq*/) {};
 void Aidtopia_SerialAudio::onError(uint16_t /*code*/) {};
 void Aidtopia_SerialAudio::onFinishedFile(Device /*device*/, uint16_t /*file_index*/) {};
 void Aidtopia_SerialAudio::onFirmwareVersion(uint16_t /*version*/) {};
@@ -350,7 +350,7 @@ void Aidtopia_SerialAudio::callHooks(const Message &msg) {
       return onStatus(device, state);
     }
     case 0x43: return onVolume(msg.getParamLo());
-    case 0x44: return onEqualizer(static_cast<Equalizer>(msg.getParamLo()));
+    case 0x44: return onEqualizer(static_cast<EqProfile>(msg.getParamLo()));
     case 0x45: return onPlaybackSequence(static_cast<Sequence>(msg.getParamLo()));
     case 0x46: return onFirmwareVersion(msg.getParam());
     case 0x47: return onDeviceFileCount(DEV_USB, msg.getParam());
@@ -590,8 +590,8 @@ void Aidtopia_SerialAudioWithLogging::onDeviceRemoved(Device src) {
   Serial.println(F(" removed."));
 }
 
-void Aidtopia_SerialAudioWithLogging::onEqualizer(Equalizer eq) {
-  Serial.print(F("Equalizer: "));
+void Aidtopia_SerialAudioWithLogging::onEqualizer(EqProfile eq) {
+  Serial.print(F("EqProfile: "));
   printEqualizerName(eq);
   Serial.println();
 }
@@ -714,7 +714,7 @@ void Aidtopia_SerialAudioWithLogging::printDeviceName(Device src) {
   }
 }
 
-void Aidtopia_SerialAudioWithLogging::printEqualizerName(Equalizer eq) {
+void Aidtopia_SerialAudioWithLogging::printEqualizerName(EqProfile eq) {
   switch (eq) {
     case EQ_NORMAL:    Serial.print(F("Normal"));    break;
     case EQ_POP:       Serial.print(F("Pop"));       break;

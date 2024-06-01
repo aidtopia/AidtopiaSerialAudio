@@ -23,7 +23,7 @@ void SerialAudio::Hooks::onQueryResponse(Parameter, uint16_t) {}
 #else
 void SerialAudio::Hooks::onCurrentFile(Device, uint16_t) {}
 void SerialAudio::Hooks::onDeviceFileCount(Device, uint16_t) {}
-void SerialAudio::Hooks::onEqualizer(Equalizer) {}
+void SerialAudio::Hooks::onEqualizer(EqProfile) {}
 void SerialAudio::Hooks::onFirmwareVersion(uint16_t) {}
 void SerialAudio::Hooks::onFolderCount(uint16_t) {}
 void SerialAudio::Hooks::onFolderTrackCount(uint16_t) {}
