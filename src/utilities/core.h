@@ -52,19 +52,20 @@ class SerialAudioManager {
         
         void update();
 
-        // Note that the devices can be OR'd to create a set.  Some players
-        // support just SDCARD. Others also support USB.
         enum class Device : uint8_t {
             NONE        = 0x00,
             USB         = 0x01,  // a USB drive
             SDCARD      = 0x02,  // Micro SD card, aka, a TF (True Flash) card
-            FLASH       = 0x04   // onboard Flash memory (via SPI interface)
+            FLASH       = 0x04,  // onboard Flash memory (via SPI interface)
+            AUX         = 0x08,  // connection to a PC over USB
+            SLEEP       = 0x10   // not selectable, but might be status results
         };
-        void selectSource(Device source);
-
+        
         void playFile(uint16_t index);
-        void setVolume(uint8_t volume);
         void reset();
+        void selectSource(Device source);
+        void setVolume(uint8_t volume);
+        bool queryVolume(uint8_t &volume);
 
     // These will become private.
         void sendMessage(Message const &msg);
@@ -79,13 +80,17 @@ class SerialAudioManager {
         SerialAudioCore         m_core;
         Timeout<MillisClock>    m_timeout;
         enum class State {
+            READY,
+            ACKPENDING,
+            RESPONSEPENDING,
             INITPENDING,
             RECOVERING,
-            READY,
-            RESPONSEPENDING,
+            SOURCEPENDINGACK,
+            SOURCEPENDINGDELAY,
             STUCK
         }                       m_state = State::INITPENDING;
-        Message::ID             m_expected = Message::ID::NONE;
+        Message::ID             m_lastRequest = Message::ID::NONE;
+        uint16_t                m_queryResult = 0;
         Message                 m_queue[8];
         uint8_t                 m_head : 4;
         uint8_t                 m_tail : 4;

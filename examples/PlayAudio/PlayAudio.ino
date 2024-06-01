@@ -33,8 +33,17 @@ void setup() {
   // set the baud rate.
   audio.begin(Serial1);
   audio.selectSource(SerialAudioManager::Device::SDCARD);
+  uint8_t volume;
+  if (audio.queryVolume(volume)) {
+    Serial.print(F("Queried volume before setting: "));
+    Serial.println(volume);
+  }
   audio.setVolume(20);
   audio.playFile(3);
+  if (audio.queryVolume(volume)) {
+    Serial.print(F("Queried volume after setting: "));
+    Serial.println(volume);
+  }
 }
 
 // We'll let the user enter raw command numbers and parameters to explore

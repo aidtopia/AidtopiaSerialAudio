@@ -65,6 +65,11 @@ void SerialAudioManager::playFile(uint16_t index) {
     enqueue(Message{Message::ID::PLAYFILE, index});
 }
 
+void SerialAudioManager::reset() {
+    clearQueue();
+    enqueue(Message{Message::ID::RESET});
+}
+
 void SerialAudioManager::selectSource(Device source) {
     auto const paramLo = static_cast<uint8_t>(source);
     enqueue(Message{Message::ID::SELECTSOURCE, 0, paramLo});
@@ -75,33 +80,46 @@ void SerialAudioManager::setVolume(uint8_t volume) {
     enqueue(Message{Message::ID::SETVOLUME, volume});
 }
 
-void SerialAudioManager::reset() {
-    clearQueue();
-    enqueue(Message{Message::ID::RESET});
+bool SerialAudioManager::queryVolume(uint8_t &volume) {
+    while (m_state != State::READY) {
+        if (m_state == State::STUCK) return false;
+        update();
+    }
+    // bypasses the queue
+    sendMessage(Message{Message::ID::VOLUME});
+    while (m_state != State::READY) {
+        if (m_state == State::STUCK) return false;
+        update();
+    }
+    volume = LSB(m_queryResult);
+    return true;
 }
 
 void SerialAudioManager::sendMessage(Message const &msg) {
     auto const msgid = msg.getID();
+    m_lastRequest = msgid;
     if (msgid == Message::ID::RESET) {
         m_core.send(msg, Feedback::FEEDBACK);
         m_timeout.set(3000);
-        m_expected = Message::ID::INITCOMPLETE;
         m_state = State::INITPENDING;
+    } else if (msgid == Message::ID::SELECTSOURCE) {
+        m_core.send(msg, Feedback::FEEDBACK);
+        m_timeout.set(33);
+        m_state = State::SOURCEPENDINGACK;
     } else if (isQuery(msgid)) {
         m_core.send(msg, Feedback::NO_FEEDBACK);
         m_timeout.set(100);
-        m_expected = msgid;
         m_state = State::RESPONSEPENDING;
     } else {
         m_core.send(msg, Feedback::FEEDBACK);
         m_timeout.set(33);
-        m_expected = Message::ID::ACK;
-        m_state = State::RESPONSEPENDING;
+        m_state = State::ACKPENDING;
     }
 }
 
 void SerialAudioManager::enqueue(Message const &msg) {
-    m_queue[m_tail++] = msg;
+    m_queue[m_tail] = msg;
+    m_tail = (m_tail + 1) % 8;
     if (m_tail == m_head) Serial.println(F("Queue overflowed!"));
     if (m_state == State::READY) dispatch();
 }
@@ -113,8 +131,11 @@ void SerialAudioManager::clearQueue() {
 void SerialAudioManager::dispatch() {
     if (m_head == m_tail) return;
 
-    Serial.println(F("Dispatching next queued message."));
-    sendMessage(m_queue[m_head++]);
+    Serial.print(F("Dispatching m_queue["));
+    Serial.print(m_head);
+    Serial.println(']');
+    sendMessage(m_queue[m_head]);
+    m_head = (m_head + 1) % 8;
 }
 
 
@@ -131,6 +152,41 @@ void SerialAudioManager::onEvent(Message const &msg) {
     }
 
     switch (m_state) {
+        case State::READY:
+            Serial.println(F("READY: "));
+            if (isError(msg.getID())) {
+                Serial.println(F("Oops, lastRequest actually got an error."));
+            } else {
+                Serial.println(F("unexpected event"));
+            }
+            break;
+        case State::ACKPENDING:
+            Serial.print(F("ACKPENDING: "));
+            if (msg.getID() == Message::ID::ACK) {
+                Serial.println(F("Ack'ed"));
+                ready();
+            } else if (isError(msg.getID())) {
+                Serial.println(F("error"));
+                ready();
+            } else {
+                Serial.println(F("unexpected event"));
+                ready();
+            }
+            break;
+        case State::RESPONSEPENDING:
+            Serial.print(F("RESPONSEPENDING: "));
+            if (msg.getID() == m_lastRequest) {
+                Serial.println(F("response received"));
+                m_queryResult = msg.getParam();
+                ready();
+            } else if (isError(msg.getID())) {
+                Serial.println(F("error"));
+                ready();
+            } else {
+                Serial.println(F("unexpected event"));
+                ready();
+            }
+            break;
         case State::INITPENDING:
             Serial.print(F("INITPENDING: "));
             if (msg.getID() == ID::ACK) {
@@ -152,22 +208,27 @@ void SerialAudioManager::onEvent(Message const &msg) {
             break;
         case State::RECOVERING:
             break;
-        case State::RESPONSEPENDING:
-            Serial.print(F("RESPONSEPENDING: "));
-            if (msg.getID() == m_expected) {
-                Serial.println(F("response received"));
-                ready();
+        case State::SOURCEPENDINGACK:
+            Serial.print(F("SOURCEPENDINGACK: "));
+            if (msg.getID() == ID::ACK) {
+                Serial.println(F("ACK received."));
+                m_timeout.set(200);  // Wait 200 ms after selecting a source.
+                m_state = State::SOURCEPENDINGDELAY;
             } else if (isError(msg.getID())) {
                 Serial.println(F("error"));
-                m_timeout.cancel();
                 m_state = State::STUCK;
             } else {
                 Serial.println(F("unexpected event"));
             }
             break;
-        case State::READY:
-            Serial.println(F("READY: "));
-            Serial.println(F("unexpected event"));
+        case State::SOURCEPENDINGDELAY:
+            Serial.print(F("SOURCEPENDINGDELAY: "));
+            if (isTimeout(msg)) {
+                Serial.println(F("delay completed"));
+                ready();
+            } else {
+                Serial.println(F("unexpected event"));
+            }
             break;
         case State::STUCK:
             Serial.println(F("STUCK: "));
@@ -178,7 +239,6 @@ void SerialAudioManager::onEvent(Message const &msg) {
 
 void SerialAudioManager::ready() {
     m_timeout.cancel();
-    m_expected = Message::ID::NONE;
     m_state = State::READY;
     dispatch();
 }
