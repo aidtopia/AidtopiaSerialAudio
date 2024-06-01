@@ -56,6 +56,13 @@ class SpyHooks : public SerialAudio::Hooks {
       Serial.println(change == DeviceChange::INSERTED ? F("INSERTED") : F("REMOVED"));
     }
 
+    void onFinishedFile(Device device, uint16_t index) override {
+      PrintDeviceName(device);
+      Serial.print(F(" index "));
+      Serial.print(index);
+      Serial.println(F(" finished playing."));
+    }
+
     void onQueryResponse(Parameter param, uint16_t value) override {
       switch (param) {
         case Parameter::FIRMWAREVERSION:
@@ -72,12 +79,6 @@ class SpyHooks : public SerialAudio::Hooks {
       }
     }
 
-    void onMessageReceived(const Message &msg) override {
-      Serial.print(F("received: "));
-      Serial.print(static_cast<uint8_t>(msg.getID()), HEX);
-      Serial.print(' ');
-      Serial.println(msg.getParam(), HEX);
-    }
   private:
     void PrintDeviceName(Device device) {
       switch (device) {
