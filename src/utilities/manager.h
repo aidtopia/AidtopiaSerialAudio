@@ -33,19 +33,59 @@ class SerialAudioManager : public SerialAudio {
         
         void update(Hooks *hooks = nullptr);
 
+        void reset();
+        void queryFileCount(Device device);
+        void selectSource(Device source);
+        void queryStatus();
+        void queryFirmwareVersion();
+
+        void setVolume(uint8_t volume);
+        void increaseVolume();
+        void decreaseVolume();
+        void queryVolume();
+
+        void setEqProfile(EqProfile eq);
+        void queryEqProfile();
+
         // Commands with "File" access sounds by their file system indexes.
-        // Commands with "Track" access them by the file name's prefix.
         void playFile(uint16_t index);
         void playNextFile();
         void playPreviousFile();
         void loopFile(uint16_t index);
         void loopAllFiles();
         void playFilesInRandomOrder();
+
+        // Commands with "Track" access sounds by the file name's prefix.
+        void queryFolderCount();
         void playTrack(uint16_t track);  // from "MP3" folder
         void playTrack(uint16_t folder, uint16_t track);
-        void reset();
-        void selectSource(Device source);
-        void setVolume(uint8_t volume);
+
+        void queryCurrentFile(Device device);
+        void queryPlaybackSequence();
+
+        void stop();
+        void pause();
+        void unpause();
+
+        // You can interrupt a track with an "advertisement" track from a folder
+        // named "ADVERT" or "ADVERTn" for n in [1..9].  When the advertisement
+        // track completes, the interrupted track will resume.  The module does
+        // not indicate when the advertisement track completes (except for a
+        // brief blip on the BUSY line if the module has one).  Inserting an
+        // advertisement will fail if nothing is currently being played (or even
+        // if it's paused).  Using stop during an advertisement stops all
+        // playback.  Using stopAdvert stops only the advertisement, allowing
+        // the interrupted track to resume.
+        void insertAdvert(uint16_t track);
+        void insertAdvert(uint8_t folder, uint8_t track);
+        void stopAdvert();
+
+#if 0
+    void sleep();
+    void wake();
+    void disableDACs();
+    void enableDACs();
+#endif
 
     // These will become private.
         void sendMessage(Message const &msg);

@@ -14,6 +14,58 @@ void SerialAudioManager::update(Hooks *hooks) {
     }
 }
 
+void SerialAudioManager::reset() {
+    clearQueue();
+    enqueue(Message{Message::ID::RESET});
+}
+
+void SerialAudioManager::queryFileCount(Device device) {
+    switch (device) {
+        case Device::USB:    enqueue(Message{Message::ID::USBFILECOUNT});   break;
+        case Device::SDCARD: enqueue(Message{Message::ID::SDFILECOUNT});    break;
+        case Device::FLASH:  enqueue(Message{Message::ID::FLASHFILECOUNT}); break;
+        default: break;
+    }
+}
+
+void SerialAudioManager::selectSource(Device source) {
+    auto const paramLo = static_cast<uint8_t>(source);
+    enqueue(Message{Message::ID::SELECTSOURCE, 0, paramLo});
+}
+
+void SerialAudioManager::queryStatus() {
+    enqueue(Message{Message::ID::STATUS});
+}
+
+void SerialAudioManager::queryFirmwareVersion() {
+    enqueue(Message{Message::ID::FIRMWAREVERSION});
+}
+
+void SerialAudioManager::setVolume(uint8_t volume) {
+    volume = min(volume, 30);
+    enqueue(Message{Message::ID::SETVOLUME, volume});
+}
+
+void SerialAudioManager::increaseVolume() {
+    enqueue(Message{Message::ID::VOLUMEUP});
+}
+
+void SerialAudioManager::decreaseVolume() {
+    enqueue(Message{Message::ID::VOLUMEDOWN});
+}
+
+void SerialAudioManager::queryVolume() {
+    enqueue(Message{Message::ID::VOLUME});
+}
+
+void SerialAudioManager::setEqProfile(EqProfile eq) {
+    enqueue(Message{Message::ID::SETEQPROFILE, static_cast<uint16_t>(eq)});
+}
+
+void SerialAudioManager::queryEqProfile() {
+    enqueue(Message{Message::ID::EQPROFILE});
+}
+
 void SerialAudioManager::playFile(uint16_t index) {
     enqueue(Message{Message::ID::PLAYFILE, index});
 }
@@ -38,6 +90,10 @@ void SerialAudioManager::playFilesInRandomOrder() {
     enqueue(Message{Message::ID::RANDOMPLAY});
 }
 
+void SerialAudioManager::queryFolderCount() {
+    enqueue(Message{Message::ID::FOLDERCOUNT});
+}
+
 void SerialAudioManager::playTrack(uint16_t track) {
     enqueue(Message{Message::ID::PLAYFROMMP3, track});
 }
@@ -55,19 +111,46 @@ void SerialAudioManager::playTrack(uint16_t folder, uint16_t track) {
     }
 }
 
-void SerialAudioManager::reset() {
-    clearQueue();
-    enqueue(Message{Message::ID::RESET});
+void SerialAudioManager::queryCurrentFile(Device device) {
+    switch (device) {
+        case Device::USB:    enqueue(Message{Message::ID::CURRENTUSBFILE});   break;
+        case Device::SDCARD: enqueue(Message{Message::ID::CURRENTSDFILE});    break;
+        case Device::FLASH:  enqueue(Message{Message::ID::CURRENTFLASHFILE}); break;
+        default: break;
+    }
 }
 
-void SerialAudioManager::selectSource(Device source) {
-    auto const paramLo = static_cast<uint8_t>(source);
-    enqueue(Message{Message::ID::SELECTSOURCE, 0, paramLo});
+void SerialAudioManager::queryPlaybackSequence() {
+    enqueue(Message{Message::ID::PLAYBACKSEQUENCE});
 }
 
-void SerialAudioManager::setVolume(uint8_t volume) {
-    volume = min(volume, 30);
-    enqueue(Message{Message::ID::SETVOLUME, volume});
+
+void SerialAudioManager::stop() {
+    enqueue(Message{Message::ID::STOP});
+}
+
+void SerialAudioManager::pause() {
+    enqueue(Message{Message::ID::PAUSE});
+}
+
+void SerialAudioManager::unpause() {
+    enqueue(Message{Message::ID::UNPAUSE});
+}
+
+
+
+
+void SerialAudioManager::insertAdvert(uint16_t track) {
+    enqueue(Message{Message::ID::INSERTADVERT, track});
+}
+
+void SerialAudioManager::insertAdvert(uint8_t folder, uint8_t track) {
+    if (folder == 0) return insertAdvert(track);
+    enqueue(Message{Message::ID::INSERTADVERTN, combine(folder, track)});
+}
+
+void SerialAudioManager::stopAdvert() {
+    enqueue(Message{Message::ID::STOPADVERT});
 }
 
 void SerialAudioManager::sendMessage(Message const &msg) {
