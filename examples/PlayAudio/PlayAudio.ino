@@ -61,6 +61,7 @@ class SpyHooks : public SerialAudio::Hooks {
       Serial.print(F(" index "));
       Serial.print(index);
       Serial.println(F(" finished playing."));
+      audio.playNextFile();
     }
 
     void onQueryResponse(Parameter param, uint16_t value) override {

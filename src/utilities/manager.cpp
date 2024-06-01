@@ -18,6 +18,26 @@ void SerialAudioManager::playFile(uint16_t index) {
     enqueue(Message{Message::ID::PLAYFILE, index});
 }
 
+void SerialAudioManager::playNextFile() {
+    enqueue(Message{Message::ID::PLAYNEXT});
+}
+
+void SerialAudioManager::playPreviousFile() {
+    enqueue(Message{Message::ID::PLAYPREVIOUS});
+}
+
+void SerialAudioManager::loopFile(uint16_t index) {
+    enqueue(Message{Message::ID::LOOPFILE, index});
+}
+
+void SerialAudioManager::loopAllFiles() {
+    enqueue(Message{Message::ID::LOOPALL});
+}
+
+void SerialAudioManager::playFilesInRandomOrder() {
+    enqueue(Message{Message::ID::RANDOMPLAY});
+}
+
 void SerialAudioManager::playTrack(uint16_t track) {
     enqueue(Message{Message::ID::PLAYFROMMP3, track});
 }

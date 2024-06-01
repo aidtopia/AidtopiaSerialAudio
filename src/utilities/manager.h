@@ -36,6 +36,11 @@ class SerialAudioManager : public SerialAudio {
         // Commands with "File" access sounds by their file system indexes.
         // Commands with "Track" access them by the file name's prefix.
         void playFile(uint16_t index);
+        void playNextFile();
+        void playPreviousFile();
+        void loopFile(uint16_t index);
+        void loopAllFiles();
+        void playFilesInRandomOrder();
         void playTrack(uint16_t track);  // from "MP3" folder
         void playTrack(uint16_t folder, uint16_t track);
         void reset();
@@ -66,8 +71,9 @@ class SerialAudioManager : public SerialAudio {
         }                       m_state = State::INITPENDING;
         Message::ID             m_lastRequest = Message::ID::NONE;
         Message                 m_queue[8];
-        uint8_t                 m_head : 4;
-        uint8_t                 m_tail : 4;
+        uint8_t                 m_head : 3;
+        uint8_t                 m_tail : 3;
+        uint8_t                 m_reserved : 2;
 };
 
 }
