@@ -13,6 +13,26 @@ static void dump(MessageBuffer const &msgbuf) {
     Serial.println();
 }
 
+SerialAudio::Hooks::~Hooks() {}
+void SerialAudio::Hooks::onError(Message::Error) {}
+void SerialAudio::Hooks::onDeviceChange(Device, DeviceChange) {}
+void SerialAudio::Hooks::onFinishedFile(Device, uint16_t) {}
+void SerialAudio::Hooks::onInitComplete(uint8_t) {}
+#if 1
+void SerialAudio::Hooks::onQueryResponse(Parameter, uint16_t) {}
+#else
+void SerialAudio::Hooks::onCurrentFile(Device, uint16_t) {}
+void SerialAudio::Hooks::onDeviceFileCount(Device, uint16_t) {}
+void SerialAudio::Hooks::onEqualizer(Equalizer) {}
+void SerialAudio::Hooks::onFirmwareVersion(uint16_t) {}
+void SerialAudio::Hooks::onFolderCount(uint16_t) {}
+void SerialAudio::Hooks::onFolderTrackCount(uint16_t) {}
+void SerialAudio::Hooks::onPlaybackSequence(Sequence) {}
+void SerialAudio::Hooks::onStatus(Device, ModuleState) {}
+void SerialAudio::Hooks::onVolume(uint8_t) {}
+#endif
+void SerialAudio::Hooks::onMessageReceived(const Message &) {}
+
 bool SerialAudioCore::checkForIncomingMessage() {
     while (m_stream->available() > 0) {
         if (m_in.receive(m_stream->read())) {
@@ -44,25 +64,36 @@ bool SerialAudioCore::update(Message *msg) {
 }
 
 
-void SerialAudioManager::update() {
+void SerialAudioManager::update(Hooks *hooks) {
     Message msg;
     if (m_core.update(&msg)) {
-        Serial.print(F("received: "));
-        Serial.print(static_cast<int>(msg.getID()), HEX);
-        Serial.print(' ');
-        Serial.println(msg.getParam(), HEX);
-        if (!isAsyncNotification(msg.getID())) {
-            m_timeout.cancel();
-        }
-        onEvent(msg);
+        if (hooks) hooks->onMessageReceived(msg);
+        onEvent(msg, hooks);
     }
     if (m_timeout.expired()) {
-        onEvent(Message{Message::Error::TIMEDOUT});
+        onEvent(Message{Message::Error::TIMEDOUT}, hooks);
     }
 }
 
 void SerialAudioManager::playFile(uint16_t index) {
     enqueue(Message{Message::ID::PLAYFILE, index});
+}
+
+void SerialAudioManager::playTrack(uint16_t track) {
+    enqueue(Message{Message::ID::PLAYFROMMP3, track});
+}
+
+void SerialAudioManager::playTrack(uint16_t folder, uint16_t track) {
+    if (track < 256) {
+        auto const param = combine(
+            static_cast<uint8_t>(folder),
+            static_cast<uint8_t>(track)
+        );
+        enqueue(Message{Message::ID::PLAYFROMFOLDER, param});
+    } else if (folder < 16) {
+        auto const param = ((folder & 0x0F) << 12) | (track & 0x0FFF);
+        enqueue(Message{Message::ID::PLAYFROMBIGFOLDER, param});
+    }
 }
 
 void SerialAudioManager::reset() {
@@ -80,26 +111,11 @@ void SerialAudioManager::setVolume(uint8_t volume) {
     enqueue(Message{Message::ID::SETVOLUME, volume});
 }
 
-bool SerialAudioManager::queryVolume(uint8_t &volume) {
-    while (m_state != State::READY) {
-        if (m_state == State::STUCK) return false;
-        update();
-    }
-    // bypasses the queue
-    sendMessage(Message{Message::ID::VOLUME});
-    while (m_state != State::READY) {
-        if (m_state == State::STUCK) return false;
-        update();
-    }
-    volume = LSB(m_queryResult);
-    return true;
-}
-
 void SerialAudioManager::sendMessage(Message const &msg) {
     auto const msgid = msg.getID();
     m_lastRequest = msgid;
     if (msgid == Message::ID::RESET) {
-        m_core.send(msg, Feedback::FEEDBACK);
+        m_core.send(msg, Feedback::NO_FEEDBACK);
         m_timeout.set(3000);
         m_state = State::INITPENDING;
     } else if (msgid == Message::ID::SELECTSOURCE) {
@@ -139,11 +155,34 @@ void SerialAudioManager::dispatch() {
 }
 
 
-void SerialAudioManager::onEvent(Message const &msg) {
+void SerialAudioManager::onEvent(Message const &msg, Hooks *hooks) {
     using ID = Message::ID;
 
     if (isAsyncNotification(msg.getID())) {
         Serial.println(F("Asynchronous notification received."));
+        if (hooks != nullptr) {
+            switch (msg.getID()) {
+                case ID::DEVICEINSERTED:
+                    hooks->onDeviceChange(static_cast<Device>(msg.getParam()),
+                                          DeviceChange::INSERTED);
+                    break;
+                case ID::DEVICEREMOVED:
+                    hooks->onDeviceChange(static_cast<Device>(msg.getParam()),
+                                          DeviceChange::REMOVED);
+                    break;
+                case ID::FINISHEDUSBFILE:
+                    hooks->onFinishedFile(Device::USB, msg.getParam());
+                    break;
+                case ID::FINISHEDSDFILE:
+                    hooks->onFinishedFile(Device::SDCARD, msg.getParam());
+                    break;
+                case ID::FINISHEDFLASHFILE:
+                    hooks->onFinishedFile(Device::FLASH, msg.getParam());
+                    break;
+                default:
+                    break;
+            }
+        }
         return;
     }
     
@@ -177,7 +216,9 @@ void SerialAudioManager::onEvent(Message const &msg) {
             Serial.print(F("RESPONSEPENDING: "));
             if (msg.getID() == m_lastRequest) {
                 Serial.println(F("response received"));
-                m_queryResult = msg.getParam();
+                if (hooks != nullptr) {
+                    hooks->onQueryResponse(static_cast<Parameter>(m_lastRequest), msg.getParam());
+                }
                 ready();
             } else if (isError(msg.getID())) {
                 Serial.println(F("error"));
@@ -216,9 +257,10 @@ void SerialAudioManager::onEvent(Message const &msg) {
                 m_state = State::SOURCEPENDINGDELAY;
             } else if (isError(msg.getID())) {
                 Serial.println(F("error"));
-                m_state = State::STUCK;
+                ready();
             } else {
                 Serial.println(F("unexpected event"));
+                ready();
             }
             break;
         case State::SOURCEPENDINGDELAY:

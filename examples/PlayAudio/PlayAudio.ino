@@ -33,17 +33,8 @@ void setup() {
   // set the baud rate.
   audio.begin(Serial1);
   audio.selectSource(SerialAudioManager::Device::SDCARD);
-  uint8_t volume;
-  if (audio.queryVolume(volume)) {
-    Serial.print(F("Queried volume before setting: "));
-    Serial.println(volume);
-  }
   audio.setVolume(20);
-  audio.playFile(3);
-  if (audio.queryVolume(volume)) {
-    Serial.print(F("Queried volume after setting: "));
-    Serial.println(volume);
-  }
+  audio.playTrack(3);
 }
 
 // We'll let the user enter raw command numbers and parameters to explore
@@ -57,8 +48,51 @@ void sendIt(uint8_t msgid, uint16_t param) {
   audio.enqueue(Message{static_cast<Message::ID>(msgid), param});
 }
 
+class SpyHooks : public SerialAudio::Hooks {
+  public:
+    void onDeviceChange(Device device, DeviceChange change) override {
+      PrintDeviceName(device);
+      Serial.print(' ');
+      Serial.println(change == DeviceChange::INSERTED ? F("INSERTED") : F("REMOVED"));
+    }
+
+    void onQueryResponse(Parameter param, uint16_t value) override {
+      switch (param) {
+        case Parameter::FIRMWAREVERSION:
+          Serial.print(F("Firmaware version: "));
+          Serial.println(value);
+          break;
+        case Parameter::VOLUME:
+          Serial.print(F("Volume: "));
+          Serial.println(value);
+          break;
+        default:
+          Serial.println(F("Ignoring query response."));
+          break;
+      }
+    }
+
+    void onMessageReceived(const Message &msg) override {
+      Serial.print(F("received: "));
+      Serial.print(static_cast<uint8_t>(msg.getID()), HEX);
+      Serial.print(' ');
+      Serial.println(msg.getParam(), HEX);
+    }
+  private:
+    void PrintDeviceName(Device device) {
+      switch (device) {
+        case Device::USB:     Serial.print(F("USB"));     break;
+        case Device::SDCARD:  Serial.print(F("SDCARD"));  break;
+        case Device::FLASH:   Serial.print(F("FLASH"));   break;
+        case Device::AUX:     Serial.print(F("AUX"));     break;
+        case Device::SLEEP:   Serial.print(F("SLEEP"));   break;
+        default:              Serial.print(F("Unknown")); break;
+      }
+    }
+} hooks;
+
 void loop() {
-  audio.update();
+  audio.update(&hooks);
 
   while (Serial.available()) {
     char ch = Serial.read();
