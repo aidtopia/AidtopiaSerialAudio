@@ -13,26 +13,6 @@ static void dump(MessageBuffer const &msgbuf) {
     Serial.println();
 }
 
-SerialAudio::Hooks::~Hooks() {}
-void SerialAudio::Hooks::onError(Message::Error) {}
-void SerialAudio::Hooks::onDeviceChange(Device, DeviceChange) {}
-void SerialAudio::Hooks::onFinishedFile(Device, uint16_t) {}
-void SerialAudio::Hooks::onInitComplete(uint8_t) {}
-#if 1
-void SerialAudio::Hooks::onQueryResponse(Parameter, uint16_t) {}
-#else
-void SerialAudio::Hooks::onCurrentFile(Device, uint16_t) {}
-void SerialAudio::Hooks::onDeviceFileCount(Device, uint16_t) {}
-void SerialAudio::Hooks::onEqualizer(EqProfile) {}
-void SerialAudio::Hooks::onFirmwareVersion(uint16_t) {}
-void SerialAudio::Hooks::onFolderCount(uint16_t) {}
-void SerialAudio::Hooks::onFolderTrackCount(uint16_t) {}
-void SerialAudio::Hooks::onPlaybackSequence(Sequence) {}
-void SerialAudio::Hooks::onStatus(Device, ModuleState) {}
-void SerialAudio::Hooks::onVolume(uint8_t) {}
-#endif
-void SerialAudio::Hooks::onMessageReceived(const Message &) {}
-
 bool SerialAudioCore::checkForIncomingMessage() {
     while (m_stream->available() > 0) {
         if (m_in.receive(m_stream->read())) {
