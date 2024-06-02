@@ -15,7 +15,7 @@ namespace aidtopia {
 class SerialAudio {
     public:
         // From the client's point of view, these enumerations are just
-        // arbitrary constants, but don't change any explicitly listed values.
+        // arbitrary constants, but do not change any explicitly listed values.
         // They correspond to ones used in the message protocol for the
         // convenience of the implementation.
 
@@ -71,6 +71,8 @@ class SerialAudio {
             VOLUME              = static_cast<uint8_t>(Message::ID::VOLUME)
         };
 
+        // Client can derive their own class from Hooks to be called back when
+        // certain events occur.  The callbacks happen during the update calls.
         class Hooks {
             public:
                 using Device = SerialAudio::Device;
@@ -104,16 +106,8 @@ class SerialAudio {
                 virtual void onVolume(uint8_t volume);
 #endif
         };
-};
-
-class SerialAudioManager : public SerialAudio {
-    public:
-        using SerialAudio::Device;
-        using SerialAudio::ModuleState;
-        using SerialAudio::EqProfile;
-        using SerialAudio::Sequence;
-        using SerialAudio::Hooks;
-    
+// class SerialAudioManager -----v
+        // Client must call begin before anything else.
         template <typename SerialType>
         void begin(SerialType &stream) {
             m_core.begin(stream);
@@ -131,14 +125,31 @@ class SerialAudioManager : public SerialAudio {
             m_timeout.set(3000);
         }
         
+        // Client should call update frequently, typically each pass through the
+        // loop funtion.
         void update(Hooks *hooks = nullptr);
 
+        // These are the commands and queries the client can use to control the
+        // audio module.
+        //
+        // All commands and queries are placed into a queue to be executed in
+        // the order the client requested.  (The one exception is `reset`, which
+        // first clears the queue.)
+        //
+        // The command at the head of the queue is executed as soon as the
+        // module is ready, so the queue cannot be used as a playlist.  If two
+        // play commands are in the queue, the second will be executed
+        // immediately after the first.  To play a list of sounds, play the
+        // first, and provide an onFileFinished hook that plays the next song
+        // in the list.  Another option is to place the sounds in a numbered
+        // folder and use the `loopFolder` command.
         void reset();
+        void queryFirmwareVersion();
         void queryFileCount(Device device);
         void selectSource(Device source);
         void queryStatus();
-        void queryFirmwareVersion();
 
+        // Volume ranges from 0 to 30.
         void setVolume(uint8_t volume);
         void increaseVolume();
         void decreaseVolume();
@@ -147,25 +158,25 @@ class SerialAudioManager : public SerialAudio {
         void setEqProfile(EqProfile eq);
         void queryEqProfile();
 
-        // Commands with "File" access sounds by their file system indexes.
+        // Methods with "File" refer to sound files by their file system index.
         void playFile(uint16_t index);
         void playNextFile();
         void playPreviousFile();
         void loopFile(uint16_t index);
         void loopAllFiles();
         void playFilesInRandomOrder();
+        void queryCurrentFile(Device device);
 
-        // Commands with "Track" access sounds by the file name's prefix.
+        // Methods with "Track" refer to sounds files by the file name's prefix.
         void queryFolderCount();
         void playTrack(uint16_t track);  // from "MP3" folder
         void playTrack(uint16_t folder, uint16_t track);
 
-        void queryCurrentFile(Device device);
-        void queryPlaybackSequence();
-
         void stop();
         void pause();
         void unpause();
+
+        void queryPlaybackSequence();
 
         // You can interrupt a track with an "advertisement" track from a folder
         // named "ADVERT" or "ADVERTn" for n in [1..9].  When the advertisement
@@ -180,7 +191,7 @@ class SerialAudioManager : public SerialAudio {
         void insertAdvert(uint8_t folder, uint8_t track);
         void stopAdvert();
 
-#if 0
+#if 0  // TBD
     void sleep();
     void wake();
     void disableDACs();
@@ -217,5 +228,7 @@ class SerialAudioManager : public SerialAudio {
 };
 
 }
+
+using AidtopiaSerialAudio = aidtopia::SerialAudio;
 
 #endif

@@ -25,19 +25,18 @@ void SerialAudio::Hooks::onStatus(Device, ModuleState) {}
 void SerialAudio::Hooks::onVolume(uint8_t) {}
 #endif
 
-
-void SerialAudioManager::update(Hooks *hooks) {
+void SerialAudio::update(Hooks *hooks) {
     Message msg;
     if (m_core.update(&msg)) onEvent(msg, hooks);
     if (m_timeout.expired()) onEvent(Message{Message::Error::TIMEDOUT}, hooks);
 }
 
-void SerialAudioManager::reset() {
+void SerialAudio::reset() {
     clearQueue();
     enqueue(Message{Message::ID::RESET});
 }
 
-void SerialAudioManager::queryFileCount(Device device) {
+void SerialAudio::queryFileCount(Device device) {
     switch (device) {
         case Device::USB:    enqueue(Message{Message::ID::USBFILECOUNT});   break;
         case Device::SDCARD: enqueue(Message{Message::ID::SDFILECOUNT});    break;
@@ -46,77 +45,77 @@ void SerialAudioManager::queryFileCount(Device device) {
     }
 }
 
-void SerialAudioManager::selectSource(Device source) {
+void SerialAudio::queryFirmwareVersion() {
+    enqueue(Message{Message::ID::FIRMWAREVERSION});
+}
+
+void SerialAudio::selectSource(Device source) {
     auto const paramLo = static_cast<uint8_t>(source);
     enqueue(Message{Message::ID::SELECTSOURCE, 0, paramLo});
 }
 
-void SerialAudioManager::queryStatus() {
+void SerialAudio::queryStatus() {
     enqueue(Message{Message::ID::STATUS});
 }
 
-void SerialAudioManager::queryFirmwareVersion() {
-    enqueue(Message{Message::ID::FIRMWAREVERSION});
-}
-
-void SerialAudioManager::setVolume(uint8_t volume) {
+void SerialAudio::setVolume(uint8_t volume) {
     volume = min(volume, 30);
     enqueue(Message{Message::ID::SETVOLUME, volume});
 }
 
-void SerialAudioManager::increaseVolume() {
+void SerialAudio::increaseVolume() {
     enqueue(Message{Message::ID::VOLUMEUP});
 }
 
-void SerialAudioManager::decreaseVolume() {
+void SerialAudio::decreaseVolume() {
     enqueue(Message{Message::ID::VOLUMEDOWN});
 }
 
-void SerialAudioManager::queryVolume() {
+void SerialAudio::queryVolume() {
     enqueue(Message{Message::ID::VOLUME});
 }
 
-void SerialAudioManager::setEqProfile(EqProfile eq) {
+void SerialAudio::setEqProfile(EqProfile eq) {
     enqueue(Message{Message::ID::SETEQPROFILE, static_cast<uint16_t>(eq)});
 }
 
-void SerialAudioManager::queryEqProfile() {
+void SerialAudio::queryEqProfile() {
     enqueue(Message{Message::ID::EQPROFILE});
 }
 
-void SerialAudioManager::playFile(uint16_t index) {
+void SerialAudio::playFile(uint16_t index) {
     enqueue(Message{Message::ID::PLAYFILE, index});
 }
 
-void SerialAudioManager::playNextFile() {
+void SerialAudio::playNextFile() {
     enqueue(Message{Message::ID::PLAYNEXT});
 }
 
-void SerialAudioManager::playPreviousFile() {
+void SerialAudio::playPreviousFile() {
     enqueue(Message{Message::ID::PLAYPREVIOUS});
 }
 
-void SerialAudioManager::loopFile(uint16_t index) {
+void SerialAudio::loopFile(uint16_t index) {
     enqueue(Message{Message::ID::LOOPFILE, index});
 }
 
-void SerialAudioManager::loopAllFiles() {
+void SerialAudio::loopAllFiles() {
     enqueue(Message{Message::ID::LOOPALL});
 }
 
-void SerialAudioManager::playFilesInRandomOrder() {
+void SerialAudio::playFilesInRandomOrder() {
     enqueue(Message{Message::ID::RANDOMPLAY});
 }
 
-void SerialAudioManager::queryFolderCount() {
+void SerialAudio::queryFolderCount() {
     enqueue(Message{Message::ID::FOLDERCOUNT});
 }
 
-void SerialAudioManager::playTrack(uint16_t track) {
+void SerialAudio::playTrack(uint16_t track) {
     enqueue(Message{Message::ID::PLAYFROMMP3, track});
 }
 
-void SerialAudioManager::playTrack(uint16_t folder, uint16_t track) {
+void SerialAudio::playTrack(uint16_t folder, uint16_t track) {
     if (track < 256) {
         auto const param = combine(
             static_cast<uint8_t>(folder),
@@ -129,7 +128,7 @@ void SerialAudioManager::playTrack(uint16_t folder, uint16_t track) {
     }
 }
 
-void SerialAudioManager::queryCurrentFile(Device device) {
+void SerialAudio::queryCurrentFile(Device device) {
     switch (device) {
         case Device::USB:    enqueue(Message{Message::ID::CURRENTUSBFILE});   break;
         case Device::SDCARD: enqueue(Message{Message::ID::CURRENTSDFILE});    break;
@@ -138,40 +137,40 @@ void SerialAudioManager::queryCurrentFile(Device device) {
     }
 }
 
-void SerialAudioManager::queryPlaybackSequence() {
+void SerialAudio::queryPlaybackSequence() {
     enqueue(Message{Message::ID::PLAYBACKSEQUENCE});
 }
 
 
-void SerialAudioManager::stop() {
+void SerialAudio::stop() {
     enqueue(Message{Message::ID::STOP});
 }
 
-void SerialAudioManager::pause() {
+void SerialAudio::pause() {
     enqueue(Message{Message::ID::PAUSE});
 }
 
-void SerialAudioManager::unpause() {
+void SerialAudio::unpause() {
     enqueue(Message{Message::ID::UNPAUSE});
 }
 
 
 
 
-void SerialAudioManager::insertAdvert(uint16_t track) {
+void SerialAudio::insertAdvert(uint16_t track) {
     enqueue(Message{Message::ID::INSERTADVERT, track});
 }
 
-void SerialAudioManager::insertAdvert(uint8_t folder, uint8_t track) {
+void SerialAudio::insertAdvert(uint8_t folder, uint8_t track) {
     if (folder == 0) return insertAdvert(track);
     enqueue(Message{Message::ID::INSERTADVERTN, combine(folder, track)});
 }
 
-void SerialAudioManager::stopAdvert() {
+void SerialAudio::stopAdvert() {
     enqueue(Message{Message::ID::STOPADVERT});
 }
 
-void SerialAudioManager::sendMessage(Message const &msg) {
+void SerialAudio::sendMessage(Message const &msg) {
     auto const msgid = msg.getID();
     m_lastRequest = msgid;
     if (msgid == Message::ID::RESET) {
@@ -193,18 +192,18 @@ void SerialAudioManager::sendMessage(Message const &msg) {
     }
 }
 
-void SerialAudioManager::enqueue(Message const &msg) {
+void SerialAudio::enqueue(Message const &msg) {
     m_queue[m_tail] = msg;
     m_tail = (m_tail + 1) % 8;
     if (m_tail == m_head) Serial.println(F("Queue overflowed!"));
     if (m_state == State::READY) dispatch();
 }
 
-void SerialAudioManager::clearQueue() {
+void SerialAudio::clearQueue() {
     m_head = m_tail = 0;
 }
 
-void SerialAudioManager::dispatch() {
+void SerialAudio::dispatch() {
     if (m_head == m_tail) return;
 
     Serial.print(F("Dispatching m_queue["));
@@ -215,7 +214,7 @@ void SerialAudioManager::dispatch() {
 }
 
 
-void SerialAudioManager::onEvent(Message const &msg, Hooks *hooks) {
+void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
     using ID = Message::ID;
 
     if (isAsyncNotification(msg.getID())) {
@@ -339,7 +338,7 @@ void SerialAudioManager::onEvent(Message const &msg, Hooks *hooks) {
     }
 }
 
-void SerialAudioManager::ready() {
+void SerialAudio::ready() {
     m_timeout.cancel();
     m_state = State::READY;
     dispatch();

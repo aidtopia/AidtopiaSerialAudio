@@ -1,8 +1,7 @@
 #include <AidtopiaSerialAudio.h>
 
-using aidtopia::SerialAudio;
-using aidtopia::SerialAudioManager;
-static SerialAudioManager audio;
+using SerialAudio = AidtopiaSerialAudio;
+static SerialAudio audio;
 
 static constexpr int hexValue(char ch) {
   return ('0' <= ch && ch <= '9') ? ch - '0' :
@@ -27,15 +26,12 @@ void setup() {
   Serial.begin(115200);
   Serial.println(F("\nAidtopia Serial Audio Test\n"));
 
-  Serial.print(F("sizeof(SerialAudioManager) = "));
-  Serial.println(sizeof(SerialAudioManager));
-
   // Initialize the audio module connected to Serial1.  If you don't have
   // a hardware serial port available, you can use SoftwareSerial.  You do
   // not have to call the serial device's begin method first.  This will
   // set the baud rate.
   audio.begin(Serial1);
-  audio.selectSource(SerialAudioManager::Device::SDCARD);
+  audio.selectSource(SerialAudio::Device::SDCARD);
   audio.queryFirmwareVersion();
   audio.queryEqProfile();
   audio.setVolume(20);
@@ -44,12 +40,12 @@ void setup() {
 
 // We'll let the user enter raw command numbers and parameters to explore
 // what's possible.
-using aidtopia::Message;
 static uint8_t cmd = 0x00;
 static uint16_t param = 0x0000;
 static int state = 0;
 
 void sendIt(uint8_t msgid, uint16_t param) {
+  using aidtopia::Message;
   Serial.println(F("--"));
   audio.enqueue(Message{static_cast<Message::ID>(msgid), param});
 }
