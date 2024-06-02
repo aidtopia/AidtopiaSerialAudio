@@ -1,7 +1,7 @@
 #include <AidtopiaSerialAudio.h>
 
-using namespace aidtopia;
-
+using aidtopia::SerialAudio;
+using aidtopia::SerialAudioManager;
 static SerialAudioManager audio;
 
 static constexpr int hexValue(char ch) {
@@ -25,7 +25,10 @@ bool applyHexDigit(char ch, T &value) {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("\nAidtopia Serial Audio Test\n");
+  Serial.println(F("\nAidtopia Serial Audio Test\n"));
+
+  Serial.print(F("sizeof(SerialAudioManager) = "));
+  Serial.println(sizeof(SerialAudioManager));
 
   // Initialize the audio module connected to Serial1.  If you don't have
   // a hardware serial port available, you can use SoftwareSerial.  You do
@@ -33,12 +36,15 @@ void setup() {
   // set the baud rate.
   audio.begin(Serial1);
   audio.selectSource(SerialAudioManager::Device::SDCARD);
+  audio.queryFirmwareVersion();
+  audio.queryEqProfile();
   audio.setVolume(20);
   audio.playTrack(3);
 }
 
 // We'll let the user enter raw command numbers and parameters to explore
 // what's possible.
+using aidtopia::Message;
 static uint8_t cmd = 0x00;
 static uint16_t param = 0x0000;
 static int state = 0;
@@ -51,23 +57,29 @@ void sendIt(uint8_t msgid, uint16_t param) {
 class SpyHooks : public SerialAudio::Hooks {
   public:
     void onDeviceChange(Device device, DeviceChange change) override {
-      PrintDeviceName(device);
+      printDeviceName(device);
       Serial.print(' ');
       Serial.println(change == DeviceChange::INSERTED ? F("INSERTED") : F("REMOVED"));
     }
 
     void onFinishedFile(Device device, uint16_t index) override {
-      PrintDeviceName(device);
+      printDeviceName(device);
       Serial.print(F(" index "));
       Serial.print(index);
       Serial.println(F(" finished playing."));
+      audio.decreaseVolume();
       audio.playNextFile();
     }
 
     void onQueryResponse(Parameter param, uint16_t value) override {
       switch (param) {
+        case Parameter::EQPROFILE:
+          Serial.print(F("Equalizer profile: "));
+          printEqProfileName(static_cast<EqProfile>(value));
+          Serial.println();
+          break;
         case Parameter::FIRMWAREVERSION:
-          Serial.print(F("Firmaware version: "));
+          Serial.print(F("Firmware version: "));
           Serial.println(value);
           break;
         case Parameter::VOLUME:
@@ -81,7 +93,7 @@ class SpyHooks : public SerialAudio::Hooks {
     }
 
   private:
-    void PrintDeviceName(Device device) {
+    void printDeviceName(Device device) {
       switch (device) {
         case Device::USB:     Serial.print(F("USB"));     break;
         case Device::SDCARD:  Serial.print(F("SDCARD"));  break;
@@ -91,7 +103,21 @@ class SpyHooks : public SerialAudio::Hooks {
         default:              Serial.print(F("Unknown")); break;
       }
     }
+
+    void printEqProfileName(EqProfile eq) {
+      switch (eq) {
+        case EqProfile::NORMAL:    Serial.print(F("Normal"));    break;
+        case EqProfile::POP:       Serial.print(F("Pop"));       break;
+        case EqProfile::ROCK:      Serial.print(F("Rock"));      break;
+        case EqProfile::JAZZ:      Serial.print(F("Jazz"));      break;
+        case EqProfile::CLASSICAL: Serial.print(F("Classical")); break;
+        case EqProfile::BASS:      Serial.print(F("Bass"));      break;
+        default:                   Serial.print(F("Unknown"));   break;
+    }
+}
+
 } hooks;
+
 
 void loop() {
   audio.update(&hooks);

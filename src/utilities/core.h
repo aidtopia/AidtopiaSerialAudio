@@ -70,6 +70,7 @@ class SerialAudio {
             public:
                 using Device = SerialAudio::Device;
                 using DeviceChange = SerialAudio::DeviceChange;
+                using EqProfile = SerialAudio::EqProfile;
                 using Parameter = SerialAudio::Parameter;
 
                 virtual ~Hooks();
