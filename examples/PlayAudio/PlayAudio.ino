@@ -52,6 +52,8 @@ void sendIt(uint8_t msgid, uint16_t param) {
 
 class SpyHooks : public SerialAudio::Hooks {
   public:
+    using EqProfile = SerialAudio::EqProfile;
+
     void onDeviceChange(Device device, DeviceChange change) override {
       printDeviceName(device);
       Serial.print(' ');

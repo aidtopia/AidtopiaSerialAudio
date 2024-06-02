@@ -71,63 +71,46 @@ class SerialAudio {
             VOLUME              = static_cast<uint8_t>(Message::ID::VOLUME)
         };
 
-        // Client can derive their own class from Hooks to be called back when
-        // certain events occur.  The callbacks happen during the update calls.
+        // Client must call `begin` before anything else, typically in `setup`.
+        // `SerialType` should be an instance of `HardwareSerial` or
+        // `SoftwareSerial`.
+        template <typename SerialType>
+        void begin(SerialType &stream) {
+            m_core.begin(stream);
+            clearQueue();
+
+            // `begin` is usually called right after power-up, so we'll assume
+            // the audio module has just powered up as well.
+            m_state = State::INITPENDING;
+            m_timeout.set(3000);
+        }
+        
+        // Client should call `update` frequently, typically each pass through
+        // the `loop` function.
+        //
+        // To receive a callback for a query response, an asynchronous
+        // notification, or an error, provide a pointer to a class derived from
+        // `SerialAudio::Hooks` the overrides the callback method(s) of
+        // interest.
+        class Hooks;
+        void update(Hooks *hooks = nullptr);
+
         class Hooks {
             public:
                 using Device = SerialAudio::Device;
                 using DeviceChange = SerialAudio::DeviceChange;
-                using EqProfile = SerialAudio::EqProfile;
                 using Parameter = SerialAudio::Parameter;
 
                 virtual ~Hooks();
 
                 virtual void onError(Message::Error code);
+                virtual void onQueryResponse(Parameter param, uint16_t value);
 
                 // Asynchronous Notifications
                 virtual void onDeviceChange(Device src, DeviceChange change);
-                virtual void onFinishedFile(Device device, uint16_t file_index);
+                virtual void onFinishedFile(Device device, uint16_t index);
                 virtual void onInitComplete(uint8_t devices);
-
-                // Query Responses
-#if 1
-                virtual void onQueryResponse(Parameter param, uint16_t value);
-#else                
-                // Breaking each of these out makes for a nicer callback API,
-                // but it also makes for a much larger v-table in RAM.
-                virtual void onCurrentFile(Device device, uint16_t file_index);
-                virtual void onDeviceFileCount(Device device, uint16_t count);
-                virtual void onEqualizer(EqProfile eq);
-                virtual void onFirmwareVersion(uint16_t version);
-                virtual void onFolderCount(uint16_t count);
-                virtual void onFolderTrackCount(uint16_t count);
-                virtual void onPlaybackSequence(Sequence seq);
-                virtual void onStatus(Device device, ModuleState state);
-                virtual void onVolume(uint8_t volume);
-#endif
         };
-// class SerialAudioManager -----v
-        // Client must call begin before anything else.
-        template <typename SerialType>
-        void begin(SerialType &stream) {
-            m_core.begin(stream);
-
-            // Arduino IDE compiler isn't up-to-date enough to allow us to put
-            // initializers for bitfield members in the class definition.  So
-            // we'll init the queue pointers here.
-            clearQueue();
-
-            // begin is usually called right after power-up, so we'll assume the
-            // audio module also just powered up.  If it's already powered up,
-            // then, once the timeout expires, the state machine will do what it
-            // needs to do.
-            m_state = State::INITPENDING;
-            m_timeout.set(3000);
-        }
-        
-        // Client should call update frequently, typically each pass through the
-        // loop funtion.
-        void update(Hooks *hooks = nullptr);
 
         // These are the commands and queries the client can use to control the
         // audio module.
