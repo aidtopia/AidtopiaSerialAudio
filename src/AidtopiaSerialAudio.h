@@ -8,6 +8,7 @@
 #define AIDTOPIASERIALAUDIO_H
 
 #include <utilities/core.h>
+#include <utilities/message.h>
 #include <utilities/timeout.h>
 
 namespace aidtopia {
@@ -100,10 +101,11 @@ class SerialAudio {
                 using Device = SerialAudio::Device;
                 using DeviceChange = SerialAudio::DeviceChange;
                 using Parameter = SerialAudio::Parameter;
+                using Error = Message::Error;
 
                 virtual ~Hooks();
 
-                virtual void onError(Message::Error code);
+                virtual void onError(Error code);
                 virtual void onQueryResponse(Parameter param, uint16_t value);
 
                 // Asynchronous Notifications
@@ -154,6 +156,7 @@ class SerialAudio {
         void queryFolderCount();
         void playTrack(uint16_t track);  // from "MP3" folder
         void playTrack(uint16_t folder, uint16_t track);
+        void loopFolder(uint16_t folder);
 
         void stop();
         void pause();

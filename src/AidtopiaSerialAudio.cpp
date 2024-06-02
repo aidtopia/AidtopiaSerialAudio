@@ -116,6 +116,10 @@ void SerialAudio::playTrack(uint16_t folder, uint16_t track) {
     }
 }
 
+void SerialAudio::loopFolder(uint16_t folder) {
+    enqueue(Message{Message::ID::LOOPFOLDER, folder});
+}
+
 void SerialAudio::queryCurrentFile(Device device) {
     switch (device) {
         case Device::USB:    enqueue(Message{Message::ID::CURRENTUSBFILE});   break;
@@ -239,9 +243,12 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
 
     switch (m_state) {
         case State::READY:
-            Serial.println(F("READY: "));
+            Serial.print(F("READY: "));
             if (isError(msg.getID())) {
                 Serial.println(F("Oops, lastRequest actually got an error."));
+                if (hooks != nullptr) {
+                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                }
             } else {
                 Serial.println(F("unexpected event"));
             }
@@ -253,6 +260,9 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 ready();
             } else if (isError(msg.getID())) {
                 Serial.println(F("error"));
+                if (hooks != nullptr) {
+                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                }
                 ready();
             } else {
                 Serial.println(F("unexpected event"));
@@ -268,7 +278,9 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 }
                 ready();
             } else if (isError(msg.getID())) {
-                Serial.println(F("error"));
+                if (hooks != nullptr) {
+                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                }
                 ready();
             } else {
                 Serial.println(F("unexpected event"));
@@ -288,7 +300,9 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 // us.  We'll check its status.
                 sendMessage(Message{ID::STATUS});
             } else if (isError(msg.getID())) {
-                Serial.println(F("error"));
+                if (hooks != nullptr) {
+                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                }
                 m_state = State::STUCK;
             } else {
                 Serial.println(F("unexpected event"));
@@ -303,7 +317,9 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 m_timeout.set(200);  // Wait 200 ms after selecting a source.
                 m_state = State::SOURCEPENDINGDELAY;
             } else if (isError(msg.getID())) {
-                Serial.println(F("error"));
+                if (hooks != nullptr) {
+                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                }
                 ready();
             } else {
                 Serial.println(F("unexpected event"));
@@ -315,13 +331,22 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
             if (isTimeout(msg)) {
                 Serial.println(F("delay completed"));
                 ready();
+            } else if (isError(msg.getID())) {
+                if (hooks != nullptr) {
+                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                }
+                ready();
             } else {
                 Serial.println(F("unexpected event"));
+                ready();
             }
             break;
         case State::STUCK:
             Serial.println(F("STUCK: "));
             Serial.println(F("unexpected event"));
+            if (isError(msg.getID()) && hooks != nullptr) {
+                hooks->onError(static_cast<Message::Error>(msg.getParam()));
+            }
             break;
     }
 }

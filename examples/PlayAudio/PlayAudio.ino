@@ -31,9 +31,15 @@ void setup() {
   // not have to call the serial device's begin method first.  This will
   // set the baud rate.
   audio.begin(Serial1);
+
+  // It's a good idea to explicitly select your input source.
   audio.selectSource(SerialAudio::Device::SDCARD);
+  
+  // Queries will generate callbacks when the response is available.
   audio.queryFirmwareVersion();
   audio.queryEqProfile();
+
+  // Basic control.
   audio.setVolume(20);
   audio.playTrack(3);
 }
@@ -53,6 +59,15 @@ void sendIt(uint8_t msgid, uint16_t param) {
 class SpyHooks : public SerialAudio::Hooks {
   public:
     using EqProfile = SerialAudio::EqProfile;
+    using Error = aidtopia::Message::Error;
+
+    void onError(Error error_code) override {
+      Serial.print(F("Error: "));
+      Serial.print(static_cast<uint16_t>(error_code), HEX);
+      Serial.print(' ');
+      printErrorName(error_code);
+      Serial.println();
+    }
 
     void onDeviceChange(Device device, DeviceChange change) override {
       printDeviceName(device);
@@ -111,9 +126,25 @@ class SpyHooks : public SerialAudio::Hooks {
         case EqProfile::CLASSICAL: Serial.print(F("Classical")); break;
         case EqProfile::BASS:      Serial.print(F("Bass"));      break;
         default:                   Serial.print(F("Unknown"));   break;
+      }
     }
-}
 
+    void printErrorName(Error error) {
+      switch (error) {
+        case Error::UNSUPPORTED:    Serial.print(F("UNSUPPORTED"));   break;
+        case Error::NOSOURCES:      Serial.print(F("NOSOURCES"));     break;
+        case Error::SLEEPING:       Serial.print(F("SLEEPING"));      break;
+        case Error::SERIALERROR:    Serial.print(F("SERIALERROR"));   break;
+        case Error::BADCHECKSUM:    Serial.print(F("BADCHECKSUM"));   break;
+        case Error::FILEOUTOFRANGE: Serial.print(F("FILEOUTOFRANGE")); break;
+        case Error::TRACKNOTFOUND:  Serial.print(F("TRACKNOTFOUND")); break;
+        case Error::INSERTIONERROR: Serial.print(F("INSERTIONERROR")); break;
+        case Error::SDCARDERROR:    Serial.print(F("SDCARDERROR"));   break;
+        case Error::ENTEREDSLEEP:   Serial.print(F("ENTEREDSLEEP"));  break;
+        case Error::TIMEDOUT:       Serial.print(F("TIMEDOUT"));      break;
+        default:                    Serial.print(F("Unknown"));       break;
+      }
+    }
 } hooks;
 
 
