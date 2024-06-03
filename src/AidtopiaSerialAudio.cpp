@@ -7,6 +7,10 @@
 
 namespace aidtopia {
 
+static constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
+  return (static_cast<uint16_t>(hi) << 8) | lo;
+}
+
 void SerialAudio::update(Hooks *hooks) {
     Message msg;
     if (m_core.update(&msg)) onEvent(msg, hooks);
@@ -26,86 +30,86 @@ void SerialAudio::Hooks::onInitComplete(uint8_t) {}
 
 void SerialAudio::reset() {
     clearQueue();
-    enqueue(Message{Message::ID::RESET});
+    enqueue(Message::ID::RESET);
 }
 
 void SerialAudio::queryFileCount(Device device) {
     switch (device) {
-        case Device::USB:    enqueue(Message{Message::ID::USBFILECOUNT});   break;
-        case Device::SDCARD: enqueue(Message{Message::ID::SDFILECOUNT});    break;
-        case Device::FLASH:  enqueue(Message{Message::ID::FLASHFILECOUNT}); break;
+        case Device::USB:    enqueue(Message::ID::USBFILECOUNT);   break;
+        case Device::SDCARD: enqueue(Message::ID::SDFILECOUNT);    break;
+        case Device::FLASH:  enqueue(Message::ID::FLASHFILECOUNT); break;
         default: break;
     }
 }
 
 void SerialAudio::queryFirmwareVersion() {
-    enqueue(Message{Message::ID::FIRMWAREVERSION});
+    enqueue(Message::ID::FIRMWAREVERSION);
 }
 
 void SerialAudio::selectSource(Device source) {
     auto const paramLo = static_cast<uint8_t>(source);
-    enqueue(Message{Message::ID::SELECTSOURCE, 0, paramLo});
+    enqueue(Message::ID::SELECTSOURCE, combine(0, paramLo));
 }
 
 void SerialAudio::queryStatus() {
-    enqueue(Message{Message::ID::STATUS});
+    enqueue(Message::ID::STATUS);
 }
 
 void SerialAudio::setVolume(uint8_t volume) {
     volume = min(volume, 30);
-    enqueue(Message{Message::ID::SETVOLUME, volume});
+    enqueue(Message::ID::SETVOLUME, volume);
 }
 
 void SerialAudio::increaseVolume() {
-    enqueue(Message{Message::ID::VOLUMEUP});
+    enqueue(Message::ID::VOLUMEUP);
 }
 
 void SerialAudio::decreaseVolume() {
-    enqueue(Message{Message::ID::VOLUMEDOWN});
+    enqueue(Message::ID::VOLUMEDOWN);
 }
 
 void SerialAudio::queryVolume() {
-    enqueue(Message{Message::ID::VOLUME});
+    enqueue(Message::ID::VOLUME);
 }
 
 void SerialAudio::setEqProfile(EqProfile eq) {
-    enqueue(Message{Message::ID::SETEQPROFILE, static_cast<uint16_t>(eq)});
+    enqueue(Message::ID::SETEQPROFILE, static_cast<uint16_t>(eq));
 }
 
 void SerialAudio::queryEqProfile() {
-    enqueue(Message{Message::ID::EQPROFILE});
+    enqueue(Message::ID::EQPROFILE);
 }
 
 void SerialAudio::playFile(uint16_t index) {
-    enqueue(Message{Message::ID::PLAYFILE, index});
+    enqueue(Message::ID::PLAYFILE, index);
 }
 
 void SerialAudio::playNextFile() {
-    enqueue(Message{Message::ID::PLAYNEXT});
+    enqueue(Message::ID::PLAYNEXT);
 }
 
 void SerialAudio::playPreviousFile() {
-    enqueue(Message{Message::ID::PLAYPREVIOUS});
+    enqueue(Message::ID::PLAYPREVIOUS);
 }
 
 void SerialAudio::loopFile(uint16_t index) {
-    enqueue(Message{Message::ID::LOOPFILE, index});
+    enqueue(Message::ID::LOOPFILE, index);
 }
 
 void SerialAudio::loopAllFiles() {
-    enqueue(Message{Message::ID::LOOPALL});
+    enqueue(Message::ID::LOOPALL);
 }
 
 void SerialAudio::playFilesInRandomOrder() {
-    enqueue(Message{Message::ID::RANDOMPLAY});
+    enqueue(Message::ID::RANDOMPLAY);
 }
 
 void SerialAudio::queryFolderCount() {
-    enqueue(Message{Message::ID::FOLDERCOUNT});
+    enqueue(Message::ID::FOLDERCOUNT);
 }
 
 void SerialAudio::playTrack(uint16_t track) {
-    enqueue(Message{Message::ID::PLAYFROMMP3, track});
+    enqueue(Message::ID::PLAYFROMMP3, track);
 }
 
 void SerialAudio::playTrack(uint16_t folder, uint16_t track) {
@@ -114,57 +118,57 @@ void SerialAudio::playTrack(uint16_t folder, uint16_t track) {
             static_cast<uint8_t>(folder),
             static_cast<uint8_t>(track)
         );
-        enqueue(Message{Message::ID::PLAYFROMFOLDER, param});
+        enqueue(Message::ID::PLAYFROMFOLDER, param);
     } else if (folder < 16) {
         auto const param = ((folder & 0x0F) << 12) | (track & 0x0FFF);
-        enqueue(Message{Message::ID::PLAYFROMBIGFOLDER, param});
+        enqueue(Message::ID::PLAYFROMBIGFOLDER, param);
     }
 }
 
 void SerialAudio::loopFolder(uint16_t folder) {
-    enqueue(Message{Message::ID::LOOPFOLDER, folder});
+    enqueue(Message::ID::LOOPFOLDER, folder);
 }
 
 void SerialAudio::queryCurrentFile(Device device) {
     switch (device) {
-        case Device::USB:    enqueue(Message{Message::ID::CURRENTUSBFILE});   break;
-        case Device::SDCARD: enqueue(Message{Message::ID::CURRENTSDFILE});    break;
-        case Device::FLASH:  enqueue(Message{Message::ID::CURRENTFLASHFILE}); break;
+        case Device::USB:    enqueue(Message::ID::CURRENTUSBFILE);   break;
+        case Device::SDCARD: enqueue(Message::ID::CURRENTSDFILE);    break;
+        case Device::FLASH:  enqueue(Message::ID::CURRENTFLASHFILE); break;
         default: break;
     }
 }
 
 void SerialAudio::queryPlaybackSequence() {
-    enqueue(Message{Message::ID::PLAYBACKSEQUENCE});
+    enqueue(Message::ID::PLAYBACKSEQUENCE);
 }
 
 
 void SerialAudio::stop() {
-    enqueue(Message{Message::ID::STOP});
+    enqueue(Message::ID::STOP);
 }
 
 void SerialAudio::pause() {
-    enqueue(Message{Message::ID::PAUSE});
+    enqueue(Message::ID::PAUSE);
 }
 
 void SerialAudio::unpause() {
-    enqueue(Message{Message::ID::UNPAUSE});
+    enqueue(Message::ID::UNPAUSE);
 }
 
 
 
 
 void SerialAudio::insertAdvert(uint16_t track) {
-    enqueue(Message{Message::ID::INSERTADVERT, track});
+    enqueue(Message::ID::INSERTADVERT, track);
 }
 
 void SerialAudio::insertAdvert(uint8_t folder, uint8_t track) {
     if (folder == 0) return insertAdvert(track);
-    enqueue(Message{Message::ID::INSERTADVERTN, combine(folder, track)});
+    enqueue(Message::ID::INSERTADVERTN, combine(folder, track));
 }
 
 void SerialAudio::stopAdvert() {
-    enqueue(Message{Message::ID::STOPADVERT});
+    enqueue(Message::ID::STOPADVERT);
 }
 
 void SerialAudio::sendMessage(Message const &msg) {
@@ -194,6 +198,10 @@ void SerialAudio::enqueue(Message const &msg) {
     m_tail = (m_tail + 1) % 8;
     if (m_tail == m_head) Serial.println(F("Queue overflowed!"));
     if (m_state == State::READY) dispatch();
+}
+
+void SerialAudio::enqueue(Message::ID msgid, uint16_t data) {
+    enqueue(msgid, data);
 }
 
 void SerialAudio::clearQueue() {

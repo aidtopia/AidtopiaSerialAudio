@@ -202,6 +202,7 @@ class SerialAudio {
     // These will become private.
         void sendMessage(Message const &msg);
         void enqueue(Message const &msg);
+        void enqueue(Message::ID msgid, uint16_t data = 0);
 
     private:
         void clearQueue();

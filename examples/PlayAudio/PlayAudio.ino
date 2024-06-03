@@ -53,7 +53,7 @@ static int state = 0;
 void sendIt(uint8_t msgid, uint16_t param) {
   using aidtopia::Message;
   Serial.println(F("--"));
-  audio.enqueue(Message{static_cast<Message::ID>(msgid), param});
+  audio.enqueue(static_cast<Message::ID>(msgid), param);
 }
 
 class SpyHooks : public SerialAudio::Hooks {

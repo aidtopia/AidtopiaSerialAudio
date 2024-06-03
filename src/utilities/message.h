@@ -3,10 +3,6 @@
 
 namespace aidtopia {
 
-inline constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
-  return (static_cast<uint16_t>(hi) << 8) | lo;
-}
-
 class Message {
     public:
         enum class ID : uint8_t {
@@ -83,10 +79,8 @@ class Message {
         };
         
         Message() : m_id(Message::ID::NONE), m_data(0) {}
-        explicit Message(Message::ID id, uint16_t param = 0) :
-            m_id(id), m_data(param) {}
-        Message(Message::ID id, uint8_t paramHi, uint8_t paramLo) :
-            m_id(id), m_data(combine(paramHi, paramLo)) {}
+        explicit Message(Message::ID id, uint16_t data = 0) :
+            m_id(id), m_data(data) {}
 
         Message::ID getID()      const { return m_id; }
         uint16_t    getParam()   const { return m_data; }

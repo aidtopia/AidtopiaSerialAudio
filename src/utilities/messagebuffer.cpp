@@ -3,7 +3,7 @@
 
 namespace aidtopia {
 
-inline constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
+static constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
   return (static_cast<uint16_t>(hi) << 8) | lo;
 }
 
