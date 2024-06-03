@@ -1,8 +1,6 @@
 #ifndef AIDTOPIA_SERIALAUDIOMESSAGEBUFFER_H
 #define AIDTOPIA_SERIALAUDIOMESSAGEBUFFER_H
 
-#include <utilities/message.h>
-
 namespace aidtopia {
 
 enum class Feedback : uint8_t {

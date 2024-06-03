@@ -6,8 +6,6 @@ namespace aidtopia {
 inline constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
   return (static_cast<uint16_t>(hi) << 8) | lo;
 }
-inline constexpr uint8_t MSB(uint16_t x) { return x >> 8; }
-inline constexpr uint8_t LSB(uint16_t x) { return x & 0xFF; }
 
 class Message {
     public:

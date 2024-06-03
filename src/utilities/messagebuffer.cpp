@@ -3,6 +3,10 @@
 
 namespace aidtopia {
 
+inline constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
+  return (static_cast<uint16_t>(hi) << 8) | lo;
+}
+
 MessageBuffer::MessageBuffer() :
     m_buf{START, VERSION, LENGTH, 0, 0, 0, 0, 0, 0, END},
     m_length(0) {}
