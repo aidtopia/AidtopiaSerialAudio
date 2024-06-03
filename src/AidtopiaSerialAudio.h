@@ -8,7 +8,6 @@
 #define AIDTOPIASERIALAUDIO_H
 
 #include <utilities/core.h>
-#include <utilities/message.h>
 #include <utilities/timeout.h>
 
 namespace aidtopia {
@@ -72,6 +71,22 @@ class SerialAudio {
             VOLUME              = static_cast<uint8_t>(Message::ID::VOLUME)
         };
 
+        enum class Error : uint16_t {
+          UNSUPPORTED        = 0x00,  // MsgID used is not supported
+          NOSOURCES          = 0x01,  // module busy or no sources installed
+          SLEEPING           = 0x02,  // module is sleeping
+          SERIALERROR        = 0x03,  // serial communication error
+          BADCHECKSUM        = 0x04,  // module received bad checksum
+          FILEOUTOFRANGE     = 0x05,  // this is the file index
+          TRACKNOTFOUND      = 0x06,  // couldn't find track by numeric prefix
+          INSERTIONERROR     = 0x07,  // couldn't start ADVERT track
+          SDCARDERROR        = 0x08,  // unformatted card??
+          ENTEREDSLEEP       = 0x0A,  // entered sleep mode??
+
+          // And reserving one for our state machine
+          TIMEDOUT           = 0x0100
+        };
+
         // Client must call `begin` before anything else, typically in `setup`.
         // `SerialType` should be an instance of `HardwareSerial` or
         // `SoftwareSerial`.
@@ -101,7 +116,7 @@ class SerialAudio {
                 using Device = SerialAudio::Device;
                 using DeviceChange = SerialAudio::DeviceChange;
                 using Parameter = SerialAudio::Parameter;
-                using Error = Message::Error;
+                using Error = SerialAudio::Error;
 
                 virtual ~Hooks();
 

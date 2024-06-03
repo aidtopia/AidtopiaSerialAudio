@@ -84,34 +84,14 @@ class Message {
             CURRENTFLASHFOLDER= 0x61
         };
         
-        enum class Error : uint16_t {
-          UNSUPPORTED        = 0x00,  // MsgID used is not supported
-          NOSOURCES          = 0x01,  // module busy or no sources installed
-          SLEEPING           = 0x02,  // module is sleeping
-          SERIALERROR        = 0x03,  // serial communication error
-          BADCHECKSUM        = 0x04,  // module received bad checksum
-          FILEOUTOFRANGE     = 0x05,  // this is the file index
-          TRACKNOTFOUND      = 0x06,  // couldn't find track by numeric prefix
-          INSERTIONERROR     = 0x07,  // couldn't start ADVERT track
-          SDCARDERROR        = 0x08,  // unformatted card??
-          ENTEREDSLEEP       = 0x0A,  // entered sleep mode??
-
-          // And reserving one for our state machine
-          TIMEDOUT           = 0x0100
-        };
-
         Message() : m_id(Message::ID::NONE), m_data(0) {}
         explicit Message(Message::ID id, uint16_t param = 0) :
             m_id(id), m_data(param) {}
         Message(Message::ID id, uint8_t paramHi, uint8_t paramLo) :
             m_id(id), m_data(combine(paramHi, paramLo)) {}
-        Message(Message::Error errorCode) :
-            m_id(Message::ID::ERROR), m_data(static_cast<uint16_t>(errorCode)) {}
 
         Message::ID getID()      const { return m_id; }
         uint16_t    getParam()   const { return m_data; }
-        uint8_t     getParamHi() const { return MSB(m_data); }
-        uint8_t     getParamLo() const { return LSB(m_data); }
 
     private:
         Message::ID m_id = Message::ID::NONE;
@@ -121,33 +101,30 @@ class Message {
 inline bool isCommand(Message::ID id) {
     return 0x00 < static_cast<uint8_t>(id) && static_cast<uint8_t>(id) < 0x30;
 }
+inline bool isCommand(Message const &msg) { return isCommand(msg.getID()); }
 
 inline bool isAsyncNotification(Message::ID id) {
     return 0x30 <= static_cast<uint8_t>(id) && static_cast<uint8_t>(id) < 0x3F;
 }
-
-inline bool isAck(Message::ID id) {
-    return id == Message::ID::ACK;
+inline bool isAsyncNotification(Message const &msg) {
+    return isAsyncNotification(msg.getID());
 }
 
-inline bool isError(Message::ID id) {
-    return id == Message::ID::ERROR;
-}
+inline bool isAck(Message::ID id) { return id == Message::ID::ACK; }
+inline bool IsAck(Message const &msg) { return isAck(msg.getID()); }
+
+inline bool isError(Message::ID id) { return id == Message::ID::ERROR; }
+inline bool isError(Message const &msg) { return isError(msg.getID()); }
 
 inline bool isQuery(Message::ID id) {
     return 0x42 <= static_cast<uint8_t>(id);
     // Supposedly Message::ID::INITCOMPLETE (0x3F) can be a query, but I've not
     // yet seen a module that supports that.
 }
+inline bool isQuery(Message const &msg) { return isQuery(msg.getID()); }
 
-inline bool isQueryResponse(Message::ID id) {
-    return isQuery(id);
-}
-
-inline bool isTimeout(Message const &msg) {
-    return msg.getID() == Message::ID::ERROR &&
-           msg.getParam() == static_cast<uint16_t>(Message::Error::TIMEDOUT);
-}
+inline bool isQueryResponse(Message::ID id) { return isQuery(id); }
+inline bool isQueryResponse(Message const &msg) { return isQuery(msg.getID()); }
 
 }
 

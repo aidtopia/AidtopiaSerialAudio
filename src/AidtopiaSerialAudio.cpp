@@ -3,17 +3,22 @@
 
 #include <Arduino.h>
 #include <AidtopiaSerialAudio.h>
+#include <utilities/message.h>
 
 namespace aidtopia {
 
 void SerialAudio::update(Hooks *hooks) {
     Message msg;
     if (m_core.update(&msg)) onEvent(msg, hooks);
-    if (m_timeout.expired()) onEvent(Message{Message::Error::TIMEDOUT}, hooks);
+    if (m_timeout.expired()) {
+        auto const timeout =
+            Message{Message::ID::ERROR, static_cast<uint8_t>(Error::TIMEDOUT)};
+        onEvent(timeout, hooks);
+    }
 }
 
 SerialAudio::Hooks::~Hooks() {}
-void SerialAudio::Hooks::onError(Message::Error) {}
+void SerialAudio::Hooks::onError(Error) {}
 void SerialAudio::Hooks::onQueryResponse(Parameter, uint16_t) {}
 void SerialAudio::Hooks::onDeviceChange(Device, DeviceChange) {}
 void SerialAudio::Hooks::onFinishedFile(Device, uint16_t) {}
@@ -206,6 +211,10 @@ void SerialAudio::dispatch() {
 }
 
 
+static bool isTimeout(Message const &msg) {
+    return isError(msg) && msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::TIMEDOUT);
+}
+
 void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
     using ID = Message::ID;
 
@@ -247,7 +256,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
             if (isError(msg.getID())) {
                 Serial.println(F("Oops, lastRequest actually got an error."));
                 if (hooks != nullptr) {
-                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                    hooks->onError(static_cast<Error>(msg.getParam()));
                 }
             } else {
                 Serial.println(F("unexpected event"));
@@ -261,7 +270,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
             } else if (isError(msg.getID())) {
                 Serial.println(F("error"));
                 if (hooks != nullptr) {
-                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                    hooks->onError(static_cast<Error>(msg.getParam()));
                 }
                 ready();
             } else {
@@ -279,7 +288,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 ready();
             } else if (isError(msg.getID())) {
                 if (hooks != nullptr) {
-                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                    hooks->onError(static_cast<Error>(msg.getParam()));
                 }
                 ready();
             } else {
@@ -301,7 +310,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 sendMessage(Message{ID::STATUS});
             } else if (isError(msg.getID())) {
                 if (hooks != nullptr) {
-                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                    hooks->onError(static_cast<SerialAudio::Error>(msg.getParam()));
                 }
                 m_state = State::STUCK;
             } else {
@@ -318,7 +327,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 m_state = State::SOURCEPENDINGDELAY;
             } else if (isError(msg.getID())) {
                 if (hooks != nullptr) {
-                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                    hooks->onError(static_cast<Error>(msg.getParam()));
                 }
                 ready();
             } else {
@@ -333,7 +342,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 ready();
             } else if (isError(msg.getID())) {
                 if (hooks != nullptr) {
-                    hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                    hooks->onError(static_cast<Error>(msg.getParam()));
                 }
                 ready();
             } else {
@@ -345,7 +354,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
             Serial.println(F("STUCK: "));
             Serial.println(F("unexpected event"));
             if (isError(msg.getID()) && hooks != nullptr) {
-                hooks->onError(static_cast<Message::Error>(msg.getParam()));
+                hooks->onError(static_cast<Error>(msg.getParam()));
             }
             break;
     }

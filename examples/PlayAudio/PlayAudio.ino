@@ -59,7 +59,7 @@ void sendIt(uint8_t msgid, uint16_t param) {
 class SpyHooks : public SerialAudio::Hooks {
   public:
     using EqProfile = SerialAudio::EqProfile;
-    using Error = aidtopia::Message::Error;
+    using Error = SerialAudio::Error;
 
     void onError(Error error_code) override {
       Serial.print(F("Error: "));
