@@ -261,7 +261,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
     switch (m_state) {
         case State::READY:
             Serial.print(F("READY: "));
-            if (isError(msg.getID())) {
+            if (isError(msg)) {
                 Serial.println(F("Oops, lastRequest actually got an error."));
                 if (hooks != nullptr) {
                     hooks->onError(static_cast<Error>(msg.getParam()));
@@ -275,7 +275,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
             if (msg.getID() == Message::ID::ACK) {
                 Serial.println(F("Ack'ed"));
                 ready();
-            } else if (isError(msg.getID())) {
+            } else if (isError(msg)) {
                 Serial.println(F("error"));
                 if (hooks != nullptr) {
                     hooks->onError(static_cast<Error>(msg.getParam()));
@@ -294,7 +294,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                     hooks->onQueryResponse(static_cast<Parameter>(m_lastRequest), msg.getParam());
                 }
                 ready();
-            } else if (isError(msg.getID())) {
+            } else if (isError(msg)) {
                 if (hooks != nullptr) {
                     hooks->onError(static_cast<Error>(msg.getParam()));
                 }
@@ -316,7 +316,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 // Maybe the module is initialized and just quietly waiting for
                 // us.  We'll check its status.
                 sendMessage(Message{ID::STATUS});
-            } else if (isError(msg.getID())) {
+            } else if (isError(msg)) {
                 if (hooks != nullptr) {
                     hooks->onError(static_cast<SerialAudio::Error>(msg.getParam()));
                 }
@@ -333,7 +333,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 Serial.println(F("ACK received."));
                 m_timeout.set(200);  // Wait 200 ms after selecting a source.
                 m_state = State::SOURCEPENDINGDELAY;
-            } else if (isError(msg.getID())) {
+            } else if (isError(msg)) {
                 if (hooks != nullptr) {
                     hooks->onError(static_cast<Error>(msg.getParam()));
                 }
@@ -348,7 +348,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
             if (isTimeout(msg)) {
                 Serial.println(F("delay completed"));
                 ready();
-            } else if (isError(msg.getID())) {
+            } else if (isError(msg)) {
                 if (hooks != nullptr) {
                     hooks->onError(static_cast<Error>(msg.getParam()));
                 }
@@ -361,7 +361,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
         case State::STUCK:
             Serial.println(F("STUCK: "));
             Serial.println(F("unexpected event"));
-            if (isError(msg.getID()) && hooks != nullptr) {
+            if (isError(msg) && hooks != nullptr) {
                 hooks->onError(static_cast<Error>(msg.getParam()));
             }
             break;
