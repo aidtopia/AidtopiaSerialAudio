@@ -11,7 +11,7 @@ But there are multiple versions of each, as well as knock offs and outright coun
 
 Documentation is fragmented, poorly translated, incomplete, and sometimes inaccurate.  There are many libraries out there, some of which are pretty good, but usually just for one or two specific versions.
 
-When purchasing a serial audio player, it can be difficult to know exactly which one you'll get.  My goal is to produce more complete documentation for these boards, and to offer a library that adapts to the quirks of whatever module you insert into your project.  I want an easy-to-use interface, without delays, that robustly handles these modules, regardless of which one you plug into your project.
+When purchasing a serial audio player, it can be difficult to know exactly which one you'll get.  My goal is to produce more complete documentation for these boards, and to offer a library that adapts to the quirks of whichever module you drop into your project.  I want an easy-to-use interface, without delays, that robustly handles these modules, regardless of which one you plug into your project.
 
 ### Audio Modules
 
@@ -29,9 +29,9 @@ After the message reference is documentation for the AidtopiaSerialAudio library
 
 ### Electrical Connections
 
-The Catalex-style players are straightforward to connect to the microcontroller.
+The Catalex-style players are straightforward to connect to a 5-volt microcontroller.
 
-The DFPlayer Minis, as well as the ones that look like it, have some non-obvious requirements worth seom attention.
+The DFPlayer Minis, as well as the ones that look like it, have some non-obvious requirements worth some attention.
 
 #### Power
 
@@ -47,9 +47,9 @@ The DFPlayer Mini's serial lines use and expect only 3.3 volts.
 
 When using a 3.3-volt microcontroller, no special considerations are necessary.
 
-When using a 5-volt microcontroller, however, you must use level shifting between the microcontroller's TX pin to DFPlayer Mini's RX pin.  If you don't, the TX pin may provide more current than the RX pin is designed to handle, which could damage the device.  Here are three ways to handle this:
+When using a 5-volt microcontroller, however, you must use level shifting between the microcontroller's TX pin to DFPlayer Mini's RX pin.  If you don't, the TX pin may provide more current than the RX pin can handle, which could damage the device.  Here are three ways to handle this:
 
-* Limit the current with a 1 k&ohm; resistor in series.  Some of the datasheets endorse this approach.
+* Limit the current with a 1 k&ohm; resistor in series.  Many of the datasheets endorse this approach.
 
 * Use a voltage divider to bring the 5-volt output from the microcontroller down to the 3.3-volt level.
 
@@ -67,15 +67,15 @@ For an audio file at maximum volume, the DAC signals range approximately from -6
 
 When a file starts playing, the amplitude ramps up to the nominal value in about 50 ms.
 
-Do not send a DAC output directly to a GPIO pin.  Most microcontrollers require inputs to be between 0 V and the chip's operating voltage (e.g., 5 volts for many common Arduino modules).  The DAC outputs swing negative, which could damage the microcontroller.  You could bias the signal to ensure it's always positive and also clip it to the allowed range to make it safe for interfacing to a GPIO pin.
+Do not send a DAC output directly to a GPIO pin.  Most microcontrollers require inputs to be between 0 V and the chip's operating voltage (e.g., 5 V for many common Arduino modules).  The DAC outputs can swing slightly negative, which could damage the microcontroller.  You could bias the signal to ensure it's always positive and also clip it to the allowed range to make it safe for interfacing to a GPIO pin.
 
 #### SPK Outputs
 
-There are two SPK outputs on the DFPlayer Mini.  They do _not_ correspond to the left and right audio channels.  The left and right channels are mixed down to mono and is amplified by a low-power amplifier built into the module.  The SPK+ and SPK- signals together comprise a balanced output.
+There are two SPK outputs on the DFPlayer Mini.  They do _not_ correspond to the left and right audio channels.  The left and right channels are mixed down to mono and amplified by a low-power amplifier built into the module.  The SPK+ and SPK- signals together comprise a balanced output.
 
 You can connect a small 8-ohm 3-watt speaker directly to the SPK pins.
 
-The SPK outputs range approximately from 0 V to 4 V.  When no sound it being played, they float at roughly the middle of their range.  When sound is being played, the SPK- output is the inverse of the SPK+.
+The SPK outputs range approximately from 0 V to 4 V.  When no sound is being played, they float at roughly the middle of their range.  When sound is being played, the SPK- output is the inverse of the SPK+.
 
 #### Optional USB Socket
 
@@ -83,7 +83,9 @@ The SPK outputs range approximately from 0 V to 4 V.  When no sound it being pla
 
 ### Source Devices
 
-Most of the serial audio players can play files stored on a micro SD card (often listed as TF for True Flash).  With the Catalex-style modules, an SD card is the only option.
+Most of the serial audio players can play files stored on a micro SD card, specifically an SD or SDHC card formatted as a FAT32 file system.  Sometimes these are labeled TF for True Flash.
+
+With the Catalex-style modules, an SD card is the only option for storing the sound files to be played.
 
 Some modules have onboard flash memory.  These are often listed as audio recorders rather than players.  Getting data onto this flash memory is currently outside the scope of this project.
 
@@ -174,7 +176,7 @@ Upon initialization, Catalex reports a volume of 0, but it seems to default to t
 
 Instead of clamping to 30, Catalex seems to use the lower 5 bits of the byte.  For example, if you set volume to 40, Catalex will confirm that it's set to 40, but the actual level is lower.  It's possible Catalex's top volume is 31 rather than 30.
 
-##### Equalizer Setting
+##### Equalizer Profile
 
 The devices have a pre-set selection of equalizer settings:
 
@@ -191,7 +193,7 @@ The devices have a pre-set selection of equalizer settings:
 
 #### Playing from the "MP3" Folder
 
-#### Inserting an "Advertisement"
+#### Inserting an Advertisement
 
 #### Stopping, Pausing, etc.
 
@@ -228,7 +230,7 @@ When a message is sent to the module with the feedback flag set, the module will
 
 The parameter in the ACK message is undefined.  Some implementations seem to re-use the message buffer, so there may seem to be data in the parameter that appears meaningful, but it isn't.
 
-If an error occurs while executing a command, the module will send a separate message to indicate the error, and this message will arrive after the ACK.
+If an error occurs while executing a command, the module will send a separate message to indicate the error, and this message will usually arrive after the ACK.  This means that you cannot know whether a command succeeded except by waiting for a period of time after the ACK to ensure that an error is not returned.
 
 When sending commands, using feedback might be useful.  When sending queries, requesting feedback is unnecessary because the module should send a response or an error, making an extra ACK superfluous.
 
