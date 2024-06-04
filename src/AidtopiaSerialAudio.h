@@ -8,6 +8,7 @@
 #define AIDTOPIASERIALAUDIO_H
 
 #include <utilities/core.h>
+#include <utilities/queue.h>
 #include <utilities/timeout.h>
 
 namespace aidtopia {
@@ -162,7 +163,6 @@ class SerialAudio {
         void loopFile(uint16_t index);
         void loopAllFiles();
         void playFilesInRandomOrder();
-        void queryCurrentFile(Device device);
 
         // Methods with "Track" refer to sounds files by the file name's prefix.
         void queryFolderCount();
@@ -170,6 +170,7 @@ class SerialAudio {
         void playTrack(uint16_t folder, uint16_t track);
         void loopFolder(uint16_t folder);
 
+        void queryCurrentFile(Device device);
         void queryPlaybackSequence();
 
         void stop();
@@ -202,14 +203,15 @@ class SerialAudio {
         void enqueue(Message::ID msgid, uint16_t data = 0);
 
     private:
-        void clearQueue();
         void dispatch();
         void onEvent(Message const &msg, Hooks *hooks);
         void ready();
         void onPowerUp();
 
         SerialAudioCore         m_core;
+        Message::ID             m_lastRequest = Message::ID::NONE;
         Timeout<MillisClock>    m_timeout;
+
         enum class State {
             READY,
             ACKPENDING,
@@ -220,11 +222,14 @@ class SerialAudio {
             SOURCEPENDINGDELAY,
             STUCK
         }                       m_state = State::INITPENDING;
-        Message::ID             m_lastRequest = Message::ID::NONE;
-        Message                 m_queue[8];
-        uint8_t                 m_head : 3;
-        uint8_t                 m_tail : 3;
-        uint8_t                 m_reserved : 2;
+
+        struct Command {
+            Message  msg;
+            Feedback feedback;
+            unsigned timeout;
+            State    state;
+        };
+        Queue<Message>          m_queue;
 };
 
 }

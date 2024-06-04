@@ -147,7 +147,6 @@ class SpyHooks : public SerialAudio::Hooks {
     }
 } hooks;
 
-
 void loop() {
   audio.update(&hooks);
 

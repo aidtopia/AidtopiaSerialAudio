@@ -11,12 +11,18 @@ static constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
   return (static_cast<uint16_t>(hi) << 8) | lo;
 }
 
+static bool isTimeout(Message const &msg) {
+    return isError(msg) &&
+           msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::TIMEDOUT);
+}
+
+
 void SerialAudio::update(Hooks *hooks) {
     Message msg;
     if (m_core.update(&msg)) onEvent(msg, hooks);
     if (m_timeout.expired()) {
         auto const timeout =
-            Message{Message::ID::ERROR, static_cast<uint8_t>(Error::TIMEDOUT)};
+            Message{Message::ID::ERROR, static_cast<uint16_t>(Error::TIMEDOUT)};
         onEvent(timeout, hooks);
     }
 }
@@ -29,7 +35,7 @@ void SerialAudio::Hooks::onFinishedFile(Device, uint16_t) {}
 void SerialAudio::Hooks::onInitComplete(uint8_t) {}
 
 void SerialAudio::reset() {
-    clearQueue();
+    m_queue.clear();
     enqueue(Message::ID::RESET);
 }
 
@@ -192,34 +198,20 @@ void SerialAudio::sendMessage(Message const &msg) {
 }
 
 void SerialAudio::enqueue(Message const &msg) {
-    m_queue[m_tail] = msg;
-    m_tail = (m_tail + 1) % 8;
-    if (m_tail == m_head) Serial.println(F("Queue overflowed!"));
+    m_queue.pushBack(msg);
     if (m_state == State::READY) dispatch();
 }
 
 void SerialAudio::enqueue(Message::ID msgid, uint16_t data) {
-    enqueue(msgid, data);
-}
-
-void SerialAudio::clearQueue() {
-    m_head = m_tail = 0;
+    enqueue(Message{msgid, data});
 }
 
 void SerialAudio::dispatch() {
-    if (m_head == m_tail) return;
-
-    Serial.print(F("Dispatching m_queue["));
-    Serial.print(m_head);
-    Serial.println(']');
-    sendMessage(m_queue[m_head]);
-    m_head = (m_head + 1) % 8;
+    if (m_queue.empty()) return;
+    sendMessage(m_queue.peekFront());
+    m_queue.popFront();
 }
 
-
-static bool isTimeout(Message const &msg) {
-    return isError(msg) && msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::TIMEDOUT);
-}
 
 void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
     using ID = Message::ID;
@@ -357,7 +349,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
             }
             break;
         case State::STUCK:
-            Serial.println(F("STUCK: "));
+            Serial.print(F("STUCK: "));
             Serial.println(F("unexpected event"));
             if (isError(msg) && hooks != nullptr) {
                 hooks->onError(static_cast<Error>(msg.getParam()));
@@ -373,9 +365,10 @@ void SerialAudio::ready() {
 }
 
 void SerialAudio::onPowerUp() {
-    clearQueue();
+    m_queue.clear();
     m_state = State::INITPENDING;
     m_timeout.set(3000);
+    Serial.println(F("onPowerUp: Waiting for INITCOMPLETE."));
 }
 
 #if 0
