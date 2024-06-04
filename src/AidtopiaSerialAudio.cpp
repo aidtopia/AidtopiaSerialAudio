@@ -156,8 +156,6 @@ void SerialAudio::unpause() {
 }
 
 
-
-
 void SerialAudio::insertAdvert(uint16_t track) {
     enqueue(Message::ID::INSERTADVERT, track);
 }
@@ -374,6 +372,12 @@ void SerialAudio::ready() {
     dispatch();
 }
 
+void SerialAudio::onPowerUp() {
+    clearQueue();
+    m_state = State::INITPENDING;
+    m_timeout.set(3000);
+}
+
 #if 0
 void printModuleStateName(ModuleState state) {
   switch (state) {
@@ -398,3 +402,5 @@ void printSequenceName(Sequence seq) {
 #endif
 
 }
+
+

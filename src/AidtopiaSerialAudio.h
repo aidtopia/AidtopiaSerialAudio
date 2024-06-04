@@ -93,12 +93,9 @@ class SerialAudio {
         template <typename SerialType>
         void begin(SerialType &stream) {
             m_core.begin(stream);
-            clearQueue();
-
-            // `begin` is usually called right after power-up, so we'll assume
+            // `begin` is usually called shortly after power-up, so we'll assume
             // the audio module has just powered up as well.
-            m_state = State::INITPENDING;
-            m_timeout.set(3000);
+            onPowerUp();
         }
         
         // Client should call `update` frequently, typically each pass through
@@ -106,7 +103,7 @@ class SerialAudio {
         //
         // To receive a callback for a query response, an asynchronous
         // notification, or an error, provide a pointer to a class derived from
-        // `SerialAudio::Hooks` the overrides the callback method(s) of
+        // `SerialAudio::Hooks` that overrides the callback method(s) of
         // interest.
         class Hooks;
         void update(Hooks *hooks = nullptr);
@@ -173,11 +170,11 @@ class SerialAudio {
         void playTrack(uint16_t folder, uint16_t track);
         void loopFolder(uint16_t folder);
 
+        void queryPlaybackSequence();
+
         void stop();
         void pause();
         void unpause();
-
-        void queryPlaybackSequence();
 
         // You can interrupt a track with an "advertisement" track from a folder
         // named "ADVERT" or "ADVERTn" for n in [1..9].  When the advertisement
@@ -209,6 +206,7 @@ class SerialAudio {
         void dispatch();
         void onEvent(Message const &msg, Hooks *hooks);
         void ready();
+        void onPowerUp();
 
         SerialAudioCore         m_core;
         Timeout<MillisClock>    m_timeout;
