@@ -46,7 +46,7 @@ void setup() {
 
 // We'll let the user enter raw command numbers and parameters to explore
 // what's possible.
-static uint8_t cmd = 0x00;
+static uint8_t msgid = 0x00;
 static uint16_t param = 0x0000;
 static int state = 0;
 
@@ -154,22 +154,22 @@ void loop() {
     char ch = Serial.read();
     switch (state) {
       case 0:
-        cmd = 0; param = 0;
-        if (applyHexDigit(ch, cmd))   { state = 1; break; }
+        msgid = 0; param = 0;
+        if (applyHexDigit(ch, msgid))   { state = 1; break; }
         else                          { state = (ch == ' ') ? 0 : 999; break; }
         break;
       case 1:
-        if (applyHexDigit(ch, cmd))   { state = 2; break; }
+        if (applyHexDigit(ch, msgid))   { state = 2; break; }
         [[fallthrough]];
       case 2:
-        if (ch == '\n')               { sendIt(cmd, param); state = 0; break; }
+        if (ch == '\n')               { sendIt(msgid, param); state = 0; break; }
         else                          { state = (ch == ' ') ? 3 : 999; break; }
         break;
       case 3:
         if (applyHexDigit(ch, param)) { break; }
         [[fallthrough]];
       case 4:
-        if (ch == '\n')               { sendIt(cmd, param); state = 0; break; }
+        if (ch == '\n')               { sendIt(msgid, param); state = 0; break; }
         else                          { state = (ch == ' ') ? 4 : 999; break; }
         break;
       default:

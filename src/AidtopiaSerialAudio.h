@@ -197,21 +197,7 @@ class SerialAudio {
     void enableDACs();
 #endif
 
-    // These will become private.
-        void sendMessage(Message const &msg);
-        void enqueue(Message const &msg);
-        void enqueue(Message::ID msgid, uint16_t data = 0);
-
-    private:
-        void dispatch();
-        void onEvent(Message const &msg, Hooks *hooks);
-        void ready();
-        void onPowerUp();
-
-        SerialAudioCore         m_core;
-        Message::ID             m_lastRequest = Message::ID::NONE;
-        Timeout<MillisClock>    m_timeout;
-
+    // This will become private:
         enum class State {
             READY,
             ACKPENDING,
@@ -221,15 +207,29 @@ class SerialAudio {
             SOURCEPENDINGACK,
             SOURCEPENDINGDELAY,
             STUCK
-        }                       m_state = State::INITPENDING;
+        };
 
         struct Command {
             Message  msg;
             Feedback feedback;
-            unsigned timeout;
             State    state;
+            unsigned timeout;
         };
-        Queue<Message>          m_queue;
+        void enqueue(Command const &cmd);
+        void enqueue(Message const &msg);
+        void enqueue(Message::ID msgid, uint16_t data = 0);
+    private:
+        void dispatch();
+        void onEvent(Message const &msg, Hooks *hooks);
+        void onPowerUp();
+        void ready();
+        void sendMessage(Message const &msg, Feedback feedback);
+
+        SerialAudioCore         m_core;
+        Message::ID             m_lastRequest = Message::ID::NONE;
+        State                   m_state = State::INITPENDING;
+        Timeout<MillisClock>    m_timeout;
+        Queue<Command>          m_queue;
 };
 
 }

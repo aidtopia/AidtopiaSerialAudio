@@ -175,31 +175,27 @@ void SerialAudio::stopAdvert() {
     enqueue(Message::ID::STOPADVERT);
 }
 
-void SerialAudio::sendMessage(Message const &msg) {
-    auto const msgid = msg.getID();
-    m_lastRequest = msgid;
-    if (msgid == Message::ID::RESET) {
-        m_core.send(msg, Feedback::NO_FEEDBACK);
-        m_timeout.set(3000);
-        m_state = State::INITPENDING;
-    } else if (msgid == Message::ID::SELECTSOURCE) {
-        m_core.send(msg, Feedback::FEEDBACK);
-        m_timeout.set(33);
-        m_state = State::SOURCEPENDINGACK;
-    } else if (isQuery(msgid)) {
-        m_core.send(msg, Feedback::NO_FEEDBACK);
-        m_timeout.set(100);
-        m_state = State::RESPONSEPENDING;
-    } else {
-        m_core.send(msg, Feedback::FEEDBACK);
-        m_timeout.set(33);
-        m_state = State::ACKPENDING;
-    }
+void SerialAudio::enqueue(Command const &cmd) {
+    m_queue.pushBack(cmd);
+    if (m_state == State::READY) dispatch();
 }
 
 void SerialAudio::enqueue(Message const &msg) {
-    m_queue.pushBack(msg);
-    if (m_state == State::READY) dispatch();
+    Command cmd = {msg, Feedback::FEEDBACK, State::ACKPENDING, 33};
+    if (cmd.msg.getID() == Message::ID::RESET) {
+        cmd.feedback = Feedback::NO_FEEDBACK;
+        cmd.state = State::INITPENDING;
+        cmd.timeout = 3000;
+    } else if (cmd.msg.getID() == Message::ID::SELECTSOURCE) {
+        cmd.feedback = Feedback::FEEDBACK;
+        cmd.state = State::SOURCEPENDINGACK;
+        cmd.timeout = 33;  // this may need to be longer
+    } else if (isQuery(cmd.msg)) {
+        cmd.feedback = Feedback::NO_FEEDBACK;
+        cmd.state = State::RESPONSEPENDING;
+        cmd.timeout = 100;
+    }
+    enqueue(cmd);
 }
 
 void SerialAudio::enqueue(Message::ID msgid, uint16_t data) {
@@ -208,7 +204,10 @@ void SerialAudio::enqueue(Message::ID msgid, uint16_t data) {
 
 void SerialAudio::dispatch() {
     if (m_queue.empty()) return;
-    sendMessage(m_queue.peekFront());
+    auto const &cmd = m_queue.peekFront();
+    sendMessage(cmd.msg, cmd.feedback);
+    m_state = cmd.state;
+    m_timeout.set(cmd.timeout);
     m_queue.popFront();
 }
 
@@ -305,7 +304,9 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 Serial.println(F("Timed out"));
                 // Maybe the module is initialized and just quietly waiting for
                 // us.  We'll check its status.
-                sendMessage(Message{ID::STATUS});
+                sendMessage(Message{ID::STATUS}, Feedback::NO_FEEDBACK);
+                m_state = State::RESPONSEPENDING;
+                m_timeout.set(33);
             } else if (isError(msg)) {
                 if (hooks != nullptr) {
                     hooks->onError(static_cast<SerialAudio::Error>(msg.getParam()));
@@ -358,17 +359,23 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
     }
 }
 
+void SerialAudio::onPowerUp() {
+    m_queue.clear();
+    m_lastRequest = Message::ID::NONE;
+    m_state = State::INITPENDING;
+    m_timeout.set(3000);
+    Serial.println(F("onPowerUp: Waiting for INITCOMPLETE."));
+}
+
 void SerialAudio::ready() {
     m_timeout.cancel();
     m_state = State::READY;
     dispatch();
 }
 
-void SerialAudio::onPowerUp() {
-    m_queue.clear();
-    m_state = State::INITPENDING;
-    m_timeout.set(3000);
-    Serial.println(F("onPowerUp: Waiting for INITCOMPLETE."));
+void SerialAudio::sendMessage(Message const &msg, Feedback feedback) {
+    m_core.send(msg, feedback);
+    m_lastRequest = msg.getID();
 }
 
 #if 0
