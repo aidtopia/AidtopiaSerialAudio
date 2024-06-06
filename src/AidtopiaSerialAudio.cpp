@@ -36,7 +36,7 @@ void SerialAudio::Hooks::onInitComplete(uint8_t) {}
 
 void SerialAudio::reset() {
     m_queue.clear();
-    enqueue(Message::ID::RESET, Feedback::FEEDBACK, State::RESETACKPENDING, 33);
+    enqueue(Message::ID::RESET, Feedback::FEEDBACK, State::RESETACKPENDING, 30);
 }
 
 void SerialAudio::queryFileCount(Device device) {
@@ -54,7 +54,8 @@ void SerialAudio::queryFirmwareVersion() {
 
 void SerialAudio::selectSource(Device source) {
     auto const paramLo = static_cast<uint8_t>(source);
-    enqueue(Message::ID::SELECTSOURCE, combine(0, paramLo));
+    enqueue(Message::ID::SELECTSOURCE, combine(0, paramLo), Feedback::FEEDBACK,
+            State::SOURCEACKPENDING, 30);
 }
 
 void SerialAudio::queryStatus() {
@@ -180,21 +181,27 @@ void SerialAudio::enqueue(Command const &cmd) {
     if (m_state == State::READY) dispatch();
 }
 
-void SerialAudio::enqueue(Message::ID msgid, uint16_t data, Feedback feedback, State state, unsigned timeout) {
+void SerialAudio::enqueue(
+    Message::ID msgid, uint16_t data,
+    Feedback feedback,
+    State state,
+    unsigned timeout
+) {
     enqueue(Command{Message{msgid, data}, feedback, state, timeout});
 }
 
-void SerialAudio::enqueue(Message::ID msgid, Feedback feedback, State state, unsigned timeout) {
+void SerialAudio::enqueue(
+    Message::ID msgid,
+    Feedback feedback,
+    State state,
+    unsigned timeout
+) {
     enqueue(msgid, 0, feedback, state, timeout);
 }
 
 void SerialAudio::enqueue(Message const &msg) {
     Command cmd = {msg, Feedback::FEEDBACK, State::ACKPENDING, 33};
-    if (cmd.msg.getID() == Message::ID::SELECTSOURCE) {
-        cmd.feedback = Feedback::FEEDBACK;
-        cmd.state = State::SOURCEACKPENDING;
-        cmd.timeout = 33;  // this may need to be longer
-    } else if (isQuery(cmd.msg)) {
+    if (isQuery(cmd.msg)) {
         cmd.feedback = Feedback::NO_FEEDBACK;
         cmd.state = State::RESPONSEPENDING;
         cmd.timeout = 100;
@@ -404,9 +411,9 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 ready();
             } else {
                 Serial.println(F("unexpected event"));
-                ready();
             }
             break;
+
         case State::STUCK:
             Serial.print(F("STUCK: "));
             Serial.println(F("unexpected event"));
