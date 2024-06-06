@@ -76,7 +76,9 @@ void setup() {
   // not have to call the serial device's begin method first.  This will
   // set the baud rate.
   audio.begin(Serial1);
-  startAudio();
+
+  // You can issue audio commands now, and they'll queue up until the device
+  // is ready.  Instead, we'll wait for the OnInitComplete callback.
 }
 
 // We'll let the user enter raw command numbers and parameters to explore
@@ -138,6 +140,18 @@ class SpyHooks : public SerialAudio::Hooks {
           Serial.println(F("Ignoring query response."));
           break;
       }
+    }
+
+    void onInitComplete(uint8_t devices) override {
+      Serial.println(F("Module has just reset or is in an unknown state."));
+      Serial.print(F("Device(s) online: "));
+      if (devices & static_cast<uint8_t>(Device::USB))    Serial.print(F("USB "));
+      if (devices & static_cast<uint8_t>(Device::SDCARD)) Serial.print(F("SD "));
+      if (devices & static_cast<uint8_t>(Device::FLASH))  Serial.print(F("FLASH "));
+      Serial.println();
+
+      Serial.println(F("Issuing commands to set up the module."));
+      startAudio();
     }
 
   private:

@@ -11,6 +11,15 @@ static constexpr uint16_t combine(uint8_t hi, uint8_t lo) {
   return (static_cast<uint16_t>(hi) << 8) | lo;
 }
 
+static constexpr uint8_t MSB(uint16_t word) {
+    return static_cast<uint8_t>(word >> 8);
+}
+
+static constexpr uint8_t LSB(uint16_t word) {
+    return static_cast<uint8_t>(word & 0x00FF);
+}
+
+
 static bool isTimeout(Message const &msg) {
     return isError(msg) &&
            msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::TIMEDOUT);
@@ -259,6 +268,11 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
         m_state != State::RESETINITPENDING
     ) {
         Serial.println(F("Audio module unexpectedly reset!"));
+        m_queue.clear();
+        if (hooks != nullptr) {
+            hooks->onInitComplete(LSB(msg.getParam()));
+        }
+        ready();
     }
 
     switch (m_state) {
@@ -312,10 +326,11 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
 
         case State::POWERUPINITPENDING:
             Serial.print(F("POWERUPINITPENDING: "));
-            if (msg.getID() == ID::ACK) {
-                Serial.println(F("unexcepted ACK while powering up"));
-            } else if (msg.getID() == ID::INITCOMPLETE) {
+            if (msg.getID() == ID::INITCOMPLETE) {
                 Serial.println(F("completed"));
+                if (hooks != nullptr) {
+                    hooks->onInitComplete(LSB(msg.getParam()));
+                }
                 ready();
             } else if (isTimeout(msg)) {
                 Serial.println(F("Timed out"));
@@ -338,6 +353,10 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
             Serial.print(F("POWERUPSTATUSPENDING: "));
             if (msg.getID() == ID::STATUS) {
                 Serial.println(F("got status response"));
+                // TODO m_state = State::DISCOVERDEVICES
+                if (hooks != nullptr) {
+                    hooks->onInitComplete(MSB(msg.getParam()));
+                }
                 ready();
             } else if (isTimeout(msg)) {
                 Serial.println(F("Timed out"));
@@ -368,6 +387,9 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
             Serial.print(F("RESETINITPENDING: "));
             if (msg.getID() == ID::INITCOMPLETE) {
                 Serial.println(F("completed"));
+                if (hooks != nullptr) {
+                    hooks->onInitComplete(LSB(msg.getParam()));
+                }
                 ready();
             } else if (isTimeout(msg)) {
                 Serial.println(F("Timed out"));
