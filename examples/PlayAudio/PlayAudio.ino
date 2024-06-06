@@ -88,9 +88,20 @@ static uint16_t param = 0x0000;
 static int state = 0;
 
 void sendIt(uint8_t msgid, uint16_t param) {
-  using aidtopia::Message;
+  using aidtopia::isQuery;
+  using ID = aidtopia::Message::ID;
+  using Feedback = aidtopia::Feedback;
+  using State = aidtopia::SerialAudio::State;
+
+  auto const id = static_cast<ID>(msgid);
+
   Serial.println(F("--"));
-  audio.enqueue(static_cast<Message::ID>(msgid), param);
+  auto const feedback = isQuery(id) ? Feedback::NO_FEEDBACK : Feedback::FEEDBACK;
+  auto const state =
+    isQuery(id) ? State::RESPONSEPENDING :
+                  State::ACKPENDING;
+  auto const timeout = isQuery(id) ? 100 : 30;
+  audio.enqueue(id, param, feedback, state, timeout);
 }
 
 class SpyHooks : public SerialAudio::Hooks {

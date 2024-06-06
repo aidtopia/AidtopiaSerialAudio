@@ -49,8 +49,8 @@ class Message {
             FINISHEDFLASHFILE = 0x3E,
 
             // Quasi-asynchronous
-            // This arrives some time after MID_RESET (or power on), so I've been
-            // viewing it as an asynchronous notification.  The Flyron
+            // This arrives some time after Message::ID::RESET (or power on), so
+            // I've been viewing it as an asynchronous notification.  The Flyron
             // documentation says the user can send this to query which storage
             // devices are online, but that doesn't work for any of the modules
             // I've tried.

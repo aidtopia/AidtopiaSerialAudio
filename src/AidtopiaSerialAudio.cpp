@@ -473,6 +473,12 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
 }
 
 void SerialAudio::onPowerUp() {
+    // I used to just hit the module with a reset command on powerup, but
+    // documentation and experience suggests that the device might not tolerate
+    // a reset while already resetting.  So we'll assume the device is powering
+    // up and wait for an initialization complete (0x3F) notification.  If one
+    // doesn't come, the state machine will fall back to figuring out whether
+    // the module is already online and to discover what devices are attached.
     m_queue.clear();
     m_lastRequest = Message::ID::NONE;
     m_state = State::POWERUPINITPENDING;

@@ -24,7 +24,8 @@ bool SerialAudioCore::checkForIncomingMessage() {
 }
 
 void SerialAudioCore::send(Message const &msg, Feedback feedback) {
-    m_out.set(static_cast<uint8_t>(msg.getID()), msg.getParam(), feedback);
+    m_out.set(static_cast<uint8_t>(msg.getID()), msg.getParam(),
+              feedback == Feedback::FEEDBACK);
     const auto buf = m_out.getBytes();
     const auto len = m_out.getLength();
     m_stream->write(buf, len);
