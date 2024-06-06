@@ -36,7 +36,7 @@ void SerialAudio::Hooks::onInitComplete(uint8_t) {}
 
 void SerialAudio::reset() {
     m_queue.clear();
-    enqueue(Message::ID::RESET);
+    enqueue(Message::ID::RESET, Feedback::FEEDBACK, State::RESETACKPENDING, 33);
 }
 
 void SerialAudio::queryFileCount(Device device) {
@@ -180,15 +180,19 @@ void SerialAudio::enqueue(Command const &cmd) {
     if (m_state == State::READY) dispatch();
 }
 
+void SerialAudio::enqueue(Message::ID msgid, uint16_t data, Feedback feedback, State state, unsigned timeout) {
+    enqueue(Command{Message{msgid, data}, feedback, state, timeout});
+}
+
+void SerialAudio::enqueue(Message::ID msgid, Feedback feedback, State state, unsigned timeout) {
+    enqueue(msgid, 0, feedback, state, timeout);
+}
+
 void SerialAudio::enqueue(Message const &msg) {
     Command cmd = {msg, Feedback::FEEDBACK, State::ACKPENDING, 33};
-    if (cmd.msg.getID() == Message::ID::RESET) {
-        cmd.feedback = Feedback::NO_FEEDBACK;
-        cmd.state = State::INITPENDING;
-        cmd.timeout = 3000;
-    } else if (cmd.msg.getID() == Message::ID::SELECTSOURCE) {
+    if (cmd.msg.getID() == Message::ID::SELECTSOURCE) {
         cmd.feedback = Feedback::FEEDBACK;
-        cmd.state = State::SOURCEPENDINGACK;
+        cmd.state = State::SOURCEACKPENDING;
         cmd.timeout = 33;  // this may need to be longer
     } else if (isQuery(cmd.msg)) {
         cmd.feedback = Feedback::NO_FEEDBACK;
@@ -243,8 +247,11 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
         return;
     }
     
-    if (msg.getID() == ID::INITCOMPLETE && m_state != State::INITPENDING) {
-        Serial.println(F("Audio device unexpectedly reset!"));
+    if (msg.getID() == ID::INITCOMPLETE &&
+        m_state != State::POWERUPINITPENDING &&
+        m_state != State::RESETINITPENDING
+    ) {
+        Serial.println(F("Audio module unexpectedly reset!"));
     }
 
     switch (m_state) {
@@ -259,6 +266,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 Serial.println(F("unexpected event"));
             }
             break;
+
         case State::ACKPENDING:
             Serial.print(F("ACKPENDING: "));
             if (msg.getID() == Message::ID::ACK) {
@@ -275,6 +283,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 ready();
             }
             break;
+
         case State::RESPONSEPENDING:
             Serial.print(F("RESPONSEPENDING: "));
             if (msg.getID() == m_lastRequest) {
@@ -293,10 +302,11 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 ready();
             }
             break;
-        case State::INITPENDING:
-            Serial.print(F("INITPENDING: "));
+
+        case State::POWERUPINITPENDING:
+            Serial.print(F("POWERUPINITPENDING: "));
             if (msg.getID() == ID::ACK) {
-                Serial.println(F("reset command ack'ed"));
+                Serial.println(F("unexcepted ACK while powering up"));
             } else if (msg.getID() == ID::INITCOMPLETE) {
                 Serial.println(F("completed"));
                 ready();
@@ -305,8 +315,8 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 // Maybe the module is initialized and just quietly waiting for
                 // us.  We'll check its status.
                 sendMessage(Message{ID::STATUS}, Feedback::NO_FEEDBACK);
-                m_state = State::RESPONSEPENDING;
-                m_timeout.set(33);
+                m_state = State::POWERUPSTATUSPENDING;
+                m_timeout.set(300);
             } else if (isError(msg)) {
                 if (hooks != nullptr) {
                     hooks->onError(static_cast<SerialAudio::Error>(msg.getParam()));
@@ -316,14 +326,61 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 Serial.println(F("unexpected event"));
             }
             break;
-        case State::RECOVERING:
+
+        case State::POWERUPSTATUSPENDING:
+            Serial.print(F("POWERUPSTATUSPENDING: "));
+            if (msg.getID() == ID::STATUS) {
+                Serial.println(F("got status response"));
+                ready();
+            } else if (isTimeout(msg)) {
+                Serial.println(F("Timed out"));
+                m_state = State::STUCK;
+            } else {
+                Serial.println(F("unexpected event"));
+            }
             break;
-        case State::SOURCEPENDINGACK:
-            Serial.print(F("SOURCEPENDINGACK: "));
+
+        case State::RESETACKPENDING:
+            Serial.print(F("RESETACKPENDING: "));
+            if (msg.getID() == Message::ID::ACK) {
+                Serial.println(F("ACK"));
+                m_timeout.set(3000);
+                m_state = State::RESETINITPENDING;
+            } else if (isError(msg)) {
+                Serial.println(F("error"));
+                if (hooks != nullptr) {
+                    hooks->onError(static_cast<Error>(msg.getParam()));
+                }
+                ready();
+            } else {
+                Serial.println(F("unexpected event"));
+            }
+            break;
+
+        case State::RESETINITPENDING:
+            Serial.print(F("RESETINITPENDING: "));
+            if (msg.getID() == ID::INITCOMPLETE) {
+                Serial.println(F("completed"));
+                ready();
+            } else if (isTimeout(msg)) {
+                Serial.println(F("Timed out"));
+                m_state = State::STUCK;
+            } else if (isError(msg)) {
+                if (hooks != nullptr) {
+                    hooks->onError(static_cast<SerialAudio::Error>(msg.getParam()));
+                }
+                m_state = State::STUCK;
+            } else {
+                Serial.println(F("unexpected event"));
+            }
+            break;
+
+        case State::SOURCEACKPENDING:
+            Serial.print(F("SOURCEACKPENDING: "));
             if (msg.getID() == ID::ACK) {
                 Serial.println(F("ACK received."));
                 m_timeout.set(200);  // Wait 200 ms after selecting a source.
-                m_state = State::SOURCEPENDINGDELAY;
+                m_state = State::SOURCEDELAYPENDING;
             } else if (isError(msg)) {
                 if (hooks != nullptr) {
                     hooks->onError(static_cast<Error>(msg.getParam()));
@@ -334,8 +391,9 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 ready();
             }
             break;
-        case State::SOURCEPENDINGDELAY:
-            Serial.print(F("SOURCEPENDINGDELAY: "));
+
+        case State::SOURCEDELAYPENDING:
+            Serial.print(F("SOURCEDELAYPENDING: "));
             if (isTimeout(msg)) {
                 Serial.println(F("delay completed"));
                 ready();
@@ -362,7 +420,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
 void SerialAudio::onPowerUp() {
     m_queue.clear();
     m_lastRequest = Message::ID::NONE;
-    m_state = State::INITPENDING;
+    m_state = State::POWERUPINITPENDING;
     m_timeout.set(3000);
     Serial.println(F("onPowerUp: Waiting for INITCOMPLETE."));
 }

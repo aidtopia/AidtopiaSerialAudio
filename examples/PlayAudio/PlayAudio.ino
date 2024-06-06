@@ -22,16 +22,34 @@ bool applyHexDigit(char ch, T &value) {
   return true;
 }
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println(F("\nAidtopia Serial Audio Test\n"));
+class Button {
+  public:
+    void begin(uint8_t pin) {
+      m_pin = pin;
+      pinMode(m_pin, INPUT_PULLUP);
+    }
 
-  // Initialize the audio module connected to Serial1.  If you don't have
-  // a hardware serial port available, you can use SoftwareSerial.  You do
-  // not have to call the serial device's begin method first.  This will
-  // set the baud rate.
-  audio.begin(Serial1);
+    bool update() {
+      if (m_state == State::UP && digitalRead(m_pin) == LOW) {
+        m_state = State::DOWN;
+        return true;
+      } else if (m_state == State::DOWN && digitalRead(m_pin) == HIGH) {
+        m_state = State::UP;
+      }
+      return false;
+    }
 
+  private:
+    uint8_t m_pin = 0;
+    enum class State { UP, DOWN } m_state = State::UP;
+};
+
+Button red_button;
+Button green_button;
+Button blue_button;
+Button yellow_button;
+
+void startAudio() {
   // It's a good idea to explicitly select your input source.
   audio.selectSource(SerialAudio::Device::SDCARD);
   
@@ -42,6 +60,23 @@ void setup() {
   // Basic control.
   audio.setVolume(20);
   audio.playTrack(3);
+}
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println(F("\nAidtopia Serial Audio Test\n"));
+
+  red_button.begin(4);
+  green_button.begin(5);
+  blue_button.begin(6);
+  yellow_button.begin(7);
+
+  // Initialize the audio module connected to Serial1.  If you don't have
+  // a hardware serial port available, you can use SoftwareSerial.  You do
+  // not have to call the serial device's begin method first.  This will
+  // set the baud rate.
+  audio.begin(Serial1);
+  startAudio();
 }
 
 // We'll let the user enter raw command numbers and parameters to explore
@@ -150,16 +185,21 @@ class SpyHooks : public SerialAudio::Hooks {
 void loop() {
   audio.update(&hooks);
 
+  if (red_button.update()) {
+    audio.reset();
+    startAudio();
+  }
+
   while (Serial.available()) {
     char ch = Serial.read();
     switch (state) {
       case 0:
         msgid = 0; param = 0;
-        if (applyHexDigit(ch, msgid))   { state = 1; break; }
+        if (applyHexDigit(ch, msgid)) { state = 1; break; }
         else                          { state = (ch == ' ') ? 0 : 999; break; }
         break;
       case 1:
-        if (applyHexDigit(ch, msgid))   { state = 2; break; }
+        if (applyHexDigit(ch, msgid)) { state = 2; break; }
         [[fallthrough]];
       case 2:
         if (ch == '\n')               { sendIt(msgid, param); state = 0; break; }

@@ -199,14 +199,20 @@ class SerialAudio {
 
     // This will become private:
         enum class State {
-            READY,
-            ACKPENDING,
-            RESPONSEPENDING,
-            INITPENDING,
-            RECOVERING,
-            SOURCEPENDINGACK,
-            SOURCEPENDINGDELAY,
-            STUCK
+            READY,                  // ready to issue another command
+            ACKPENDING,             // handles general commands
+            RESPONSEPENDING,        // handles general queries
+
+            POWERUPINITPENDING,     // module may have just powered up
+            POWERUPSTATUSPENDING,   // check if module is alive
+
+            RESETACKPENDING,        // explicitly resetting the module
+            RESETINITPENDING,       // expecting response to the reset
+
+            SOURCEACKPENDING,       // source device being set
+            SOURCEDELAYPENDING,     // don't send commands right after selecting source
+
+            STUCK                   // module is unresponsive or in a bad state
         };
 
         struct Command {
@@ -216,6 +222,8 @@ class SerialAudio {
             unsigned timeout;
         };
         void enqueue(Command const &cmd);
+        void enqueue(Message::ID msgid, uint16_t data, Feedback feedback, State state, unsigned timeout);
+        void enqueue(Message::ID msgid, Feedback feedback, State state, unsigned timout);
         void enqueue(Message const &msg);
         void enqueue(Message::ID msgid, uint16_t data = 0);
     private:
@@ -227,7 +235,7 @@ class SerialAudio {
 
         SerialAudioCore         m_core;
         Message::ID             m_lastRequest = Message::ID::NONE;
-        State                   m_state = State::INITPENDING;
+        State                   m_state = State::POWERUPINITPENDING;
         Timeout<MillisClock>    m_timeout;
         Queue<Command>          m_queue;
 };
