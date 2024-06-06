@@ -19,7 +19,6 @@ static constexpr uint8_t LSB(uint16_t word) {
     return static_cast<uint8_t>(word & 0x00FF);
 }
 
-
 static bool isTimeout(Message const &msg) {
     return isError(msg) &&
            msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::TIMEDOUT);
@@ -58,7 +57,8 @@ void SerialAudio::queryFileCount(Device device) {
 }
 
 void SerialAudio::queryFirmwareVersion() {
-    enqueue(Message::ID::FIRMWAREVERSION);
+    enqueue(Message::ID::FIRMWAREVERSION, Feedback::NO_FEEDBACK,
+            State::RESPONSEPENDING, 100);
 }
 
 void SerialAudio::selectSource(Device source) {
@@ -68,7 +68,8 @@ void SerialAudio::selectSource(Device source) {
 }
 
 void SerialAudio::queryStatus() {
-    enqueue(Message::ID::STATUS);
+    enqueue(Message::ID::STATUS, Feedback::NO_FEEDBACK,
+            State::RESPONSEPENDING, 100);
 }
 
 void SerialAudio::setVolume(uint8_t volume) {
@@ -85,7 +86,8 @@ void SerialAudio::decreaseVolume() {
 }
 
 void SerialAudio::queryVolume() {
-    enqueue(Message::ID::VOLUME);
+    enqueue(Message::ID::VOLUME, Feedback::NO_FEEDBACK,
+            State::RESPONSEPENDING, 100);
 }
 
 void SerialAudio::setEqProfile(EqProfile eq) {
@@ -93,7 +95,8 @@ void SerialAudio::setEqProfile(EqProfile eq) {
 }
 
 void SerialAudio::queryEqProfile() {
-    enqueue(Message::ID::EQPROFILE);
+    enqueue(Message::ID::EQPROFILE, Feedback::NO_FEEDBACK,
+            State::RESPONSEPENDING, 100);
 }
 
 void SerialAudio::playFile(uint16_t index) {
@@ -121,7 +124,8 @@ void SerialAudio::playFilesInRandomOrder() {
 }
 
 void SerialAudio::queryFolderCount() {
-    enqueue(Message::ID::FOLDERCOUNT);
+    enqueue(Message::ID::FOLDERCOUNT, Feedback::NO_FEEDBACK,
+            State::RESPONSEPENDING, 100);
 }
 
 void SerialAudio::playTrack(uint16_t track) {
@@ -146,16 +150,19 @@ void SerialAudio::loopFolder(uint16_t folder) {
 }
 
 void SerialAudio::queryCurrentFile(Device device) {
+    auto msgid = Message::ID::NONE;
     switch (device) {
-        case Device::USB:    enqueue(Message::ID::CURRENTUSBFILE);   break;
-        case Device::SDCARD: enqueue(Message::ID::CURRENTSDFILE);    break;
-        case Device::FLASH:  enqueue(Message::ID::CURRENTFLASHFILE); break;
-        default: break;
+        case Device::USB:    msgid = Message::ID::CURRENTUSBFILE;   break;
+        case Device::SDCARD: msgid = Message::ID::CURRENTSDFILE;    break;
+        case Device::FLASH:  msgid = Message::ID::CURRENTFLASHFILE; break;
+        default: return;
     }
+    enqueue(msgid, Feedback::NO_FEEDBACK, State::RESPONSEPENDING, 100);
 }
 
 void SerialAudio::queryPlaybackSequence() {
-    enqueue(Message::ID::PLAYBACKSEQUENCE);
+    enqueue(Message::ID::PLAYBACKSEQUENCE, Feedback::NO_FEEDBACK,
+            State::RESPONSEPENDING, 100);
 }
 
 
@@ -210,11 +217,6 @@ void SerialAudio::enqueue(
 
 void SerialAudio::enqueue(Message const &msg) {
     Command cmd = {msg, Feedback::FEEDBACK, State::ACKPENDING, 33};
-    if (isQuery(cmd.msg)) {
-        cmd.feedback = Feedback::NO_FEEDBACK;
-        cmd.state = State::RESPONSEPENDING;
-        cmd.timeout = 100;
-    }
     enqueue(cmd);
 }
 
