@@ -143,7 +143,7 @@ class SpyHooks : public SerialAudio::Hooks {
     }
 
     void onInitComplete(uint8_t devices) override {
-      Serial.println(F("Module has just reset or is in an unknown state."));
+      Serial.println(F("Module has just reset."));
       Serial.print(F("Device(s) online: "));
       if (devices & static_cast<uint8_t>(Device::USB))    Serial.print(F("USB "));
       if (devices & static_cast<uint8_t>(Device::SDCARD)) Serial.print(F("SD "));
@@ -199,10 +199,10 @@ class SpyHooks : public SerialAudio::Hooks {
 void loop() {
   audio.update(&hooks);
 
-  if (red_button.update()) {
-    audio.reset();
-    startAudio();
-  }
+  if (red_button.update())      audio.stop();
+  if (green_button.update())    audio.loopFolder(1);
+  if (blue_button.update())     audio.loopFolder(47);  // no such folder.
+  if (yellow_button.update())   audio.reset();
 
   while (Serial.available()) {
     char ch = Serial.read();

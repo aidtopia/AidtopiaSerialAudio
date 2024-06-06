@@ -201,6 +201,7 @@ class SerialAudio {
         enum class State {
             READY,                  // ready to issue another command
             ACKPENDING,             // handles general commands
+            EXTRAACKPENDING,        // handles an expected extra ACK
             RESPONSEPENDING,        // handles general queries
 
             POWERUPINITPENDING,     // module may have just powered up

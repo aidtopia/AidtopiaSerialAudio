@@ -16,8 +16,7 @@ static void dump(MessageBuffer const &msgbuf) {
 bool SerialAudioCore::checkForIncomingMessage() {
     while (m_stream->available() > 0) {
         if (m_in.receive(m_stream->read())) {
-            Serial.print(F("< "));
-            dump(m_in);
+            Serial.print(F("< ")); dump(m_in);
             if (m_in.isValid()) return true;
         }
     }
@@ -31,7 +30,6 @@ void SerialAudioCore::send(Message const &msg, Feedback feedback) {
     m_stream->write(buf, len);
     Serial.print(F("> ")); dump(m_out);
 }
-
 
 bool SerialAudioCore::update(Message *msg) {
     if (checkForIncomingMessage()) {

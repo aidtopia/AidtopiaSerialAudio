@@ -146,7 +146,13 @@ void SerialAudio::playTrack(uint16_t folder, uint16_t track) {
 }
 
 void SerialAudio::loopFolder(uint16_t folder) {
-    enqueue(Message::ID::LOOPFOLDER, folder);
+    // Note the longer timeout because the modules take a bit longer.  I think
+    // the module checks the filesystem for the folder first.
+    // Also note this command ACKs twice when successful.  I think one is for
+    // the command to put it into loop folder mode and the second is when it
+    // actually begins playing.
+    enqueue(Message::ID::LOOPFOLDER, folder, Feedback::FEEDBACK,
+            State::EXTRAACKPENDING, 100);
 }
 
 void SerialAudio::queryCurrentFile(Device device) {
@@ -295,6 +301,24 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
             if (msg.getID() == Message::ID::ACK) {
                 Serial.println(F("Ack'ed"));
                 ready();
+            } else if (isError(msg)) {
+                Serial.println(F("error"));
+                if (hooks != nullptr) {
+                    hooks->onError(static_cast<Error>(msg.getParam()));
+                }
+                ready();
+            } else {
+                Serial.println(F("unexpected event"));
+                ready();
+            }
+            break;
+
+        case State::EXTRAACKPENDING:
+            Serial.print(F("EXTRAACKPENDING: "));
+            if (msg.getID() == Message::ID::ACK) {
+                Serial.println(F("ACK'ed"));
+                m_timeout.set(100);
+                m_state = State::ACKPENDING;
             } else if (isError(msg)) {
                 Serial.println(F("error"));
                 if (hooks != nullptr) {
