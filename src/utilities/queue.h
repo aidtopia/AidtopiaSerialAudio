@@ -39,8 +39,8 @@ class Queue {
     private:
         static constexpr uint8_t CAPACITY = 8;
         T       m_buffer[CAPACITY];
-        uint8_t m_head : 3;
-        uint8_t m_tail : 3;
+        uint8_t m_head : 3;  // log_2(CAPACITY)
+        uint8_t m_tail : 3;  // log_2(CAPACITY)
         uint8_t m_full : 1;
         uint8_t m_reserved : 1;
 };

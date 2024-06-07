@@ -66,6 +66,21 @@ void setup() {
   Serial.begin(115200);
   Serial.println(F("\nAidtopia Serial Audio Test\n"));
 
+  Serial.print(F("sizeof(audio) = "));
+  Serial.println(sizeof(audio));
+  Serial.print(F("sizeof(aidtopia::SerialAudioCore) = "));
+  Serial.println(sizeof(aidtopia::SerialAudioCore));
+  Serial.print(F("sizeof(aidtopia::MessageBuffer) = "));
+  Serial.println(sizeof(aidtopia::MessageBuffer));
+  Serial.print(F("sizeof(aidtopia::Queue<SerialAudio::Command>) = "));
+  Serial.println(sizeof(aidtopia::Queue<SerialAudio::Command>));
+  Serial.print(F("sizeof(aidtopia::SerialAudio::Command) = "));
+  Serial.println(sizeof(aidtopia::SerialAudio::Command));
+  Serial.print(F("sizeof(aidtopia::Message) = "));
+  Serial.println(sizeof(aidtopia::Message));
+  Serial.print(F("sizeof(aidtopia::Timeout<aidtopia::MillisClock>) = "));
+  Serial.println(sizeof(aidtopia::Timeout<aidtopia::MillisClock>));
+
   red_button.begin(4);
   green_button.begin(5);
   blue_button.begin(6);

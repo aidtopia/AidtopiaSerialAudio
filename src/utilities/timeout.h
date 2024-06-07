@@ -1,6 +1,8 @@
 #ifndef AIDTOPIATIMEOUT_H
 #define AIDTOPIATIMEOUT_H
 
+namespace aidtopia {
+
 struct MillisClock { static decltype(millis()) now() { return millis(); } };
 struct MicrosClock { static decltype(micros()) now() { return micros(); } };
 
@@ -45,5 +47,7 @@ class Timeout {
     static constexpr TimeRep MSB_MASK =
       static_cast<TimeRep>(1) << (8 * sizeof(TimeRep) - 1);
 };
+
+}
 
 #endif
