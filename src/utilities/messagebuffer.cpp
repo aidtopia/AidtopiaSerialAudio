@@ -11,17 +11,18 @@ MessageBuffer::MessageBuffer() :
     m_buf{START, VERSION, LENGTH, 0, 0, 0, 0, 0, 0, END},
     m_length(0) {}
 
-void MessageBuffer::set(uint8_t msgid, uint16_t param, bool feedback) {
-    // Note that we're filling in just the bytes that change.  We rely
-    // on the framing bytes set when the buffer was first initialized.
-    m_buf[3] = msgid;
-    m_buf[4] = feedback ? 0x01 : 0x00;
-    m_buf[5] = (param >> 8) & 0xFF;
-    m_buf[6] = (param     ) & 0xFF;
+MessageBuffer::MessageBuffer(uint8_t msgid, uint16_t param, bool feedback) :
+    m_buf{START, VERSION, LENGTH,
+          msgid,
+          static_cast<uint8_t>(feedback ? 0x01 : 0x00),
+          static_cast<uint8_t>((param >> 8) & 0xFF),
+          static_cast<uint8_t>((param     ) & 0xFF),
+          0, 0, END},
+    m_length(10)
+{
     auto const checksum = ~sum() + 1u;
     m_buf[7] = (checksum >> 8) & 0xFF;
     m_buf[8] = (checksum     ) & 0xFF;
-    m_length = 10;
 }
 
 uint8_t const *MessageBuffer::getBytes() const { return m_buf; }

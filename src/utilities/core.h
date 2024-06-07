@@ -27,7 +27,6 @@ class SerialAudioCore {
 
         Stream        *m_stream;
         MessageBuffer  m_in;
-        MessageBuffer  m_out;
 };
 
 }

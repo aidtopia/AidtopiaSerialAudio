@@ -12,8 +12,7 @@ enum class Feedback : uint8_t {
 class MessageBuffer {
   public:
     MessageBuffer();
-
-    void set(uint8_t msgid, uint16_t data, bool feedback);
+    MessageBuffer(uint8_t msgid, uint16_t data, bool feedback);
 
     const uint8_t *getBytes() const;
     uint8_t getLength() const;

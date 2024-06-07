@@ -3,12 +3,12 @@
 
 namespace aidtopia {
 
-static void dump(MessageBuffer const &msgbuf) {
-    auto const buf = msgbuf.getBytes();
-    auto const len = msgbuf.getLength();
-    for (int i = 0; i < len; ++i) {
-        Serial.print(buf[i], HEX);
+static void dump(uint8_t const *buf, uint8_t len) {
+    if (len == 0) return;
+    Serial.print(buf[0], HEX);
+    for (int i = 1; i < len; ++i) {
         Serial.print(' ');
+        Serial.print(buf[i], HEX);
     }
     Serial.println();
 }
@@ -16,7 +16,7 @@ static void dump(MessageBuffer const &msgbuf) {
 bool SerialAudioCore::checkForIncomingMessage() {
     while (m_stream->available() > 0) {
         if (m_in.receive(m_stream->read())) {
-            Serial.print(F("< ")); dump(m_in);
+            Serial.print(F("< ")); dump(m_in.getBytes(), m_in.getLength());
             if (m_in.isValid()) return true;
         }
     }
@@ -24,12 +24,13 @@ bool SerialAudioCore::checkForIncomingMessage() {
 }
 
 void SerialAudioCore::send(Message const &msg, Feedback feedback) {
-    m_out.set(static_cast<uint8_t>(msg.getID()), msg.getParam(),
-              feedback == Feedback::FEEDBACK);
-    const auto buf = m_out.getBytes();
-    const auto len = m_out.getLength();
+    auto const out =
+        MessageBuffer(static_cast<uint8_t>(msg.getID()), msg.getParam(),
+                      feedback == Feedback::FEEDBACK);
+    const auto buf = out.getBytes();
+    const auto len = out.getLength();
     m_stream->write(buf, len);
-    Serial.print(F("> ")); dump(m_out);
+    Serial.print(F("> ")); dump(buf, len);
 }
 
 bool SerialAudioCore::update(Message *msg) {
