@@ -1,6 +1,6 @@
 #include <AidtopiaSerialAudio.h>
 
-using SerialAudio = AidtopiaSerialAudio;
+using SerialAudio = aidtopia::SerialAudio1;
 static SerialAudio audio;
 
 static constexpr int hexValue(char ch) {
@@ -68,18 +68,6 @@ void setup() {
 
   Serial.print(F("sizeof(audio) = "));
   Serial.println(sizeof(audio));
-  Serial.print(F("sizeof(aidtopia::SerialAudioCore) = "));
-  Serial.println(sizeof(aidtopia::SerialAudioCore));
-  Serial.print(F("sizeof(aidtopia::MessageBuffer) = "));
-  Serial.println(sizeof(aidtopia::MessageBuffer));
-  Serial.print(F("sizeof(aidtopia::Queue<SerialAudio::Command, 6>) = "));
-  Serial.println(sizeof(aidtopia::Queue<SerialAudio::Command, 6>));
-  Serial.print(F("sizeof(aidtopia::SerialAudio::Command) = "));
-  Serial.println(sizeof(aidtopia::SerialAudio::Command));
-  Serial.print(F("sizeof(aidtopia::Message) = "));
-  Serial.println(sizeof(aidtopia::Message));
-  Serial.print(F("sizeof(aidtopia::Timeout<aidtopia::MillisClock>) = "));
-  Serial.println(sizeof(aidtopia::Timeout<aidtopia::MillisClock>));
 
   red_button.begin(4);
   green_button.begin(5);
@@ -96,6 +84,7 @@ void setup() {
   // is ready.  Instead, we'll wait for the OnInitComplete callback.
 }
 
+#ifdef OLD_STATE
 // We'll let the user enter raw command numbers and parameters to explore
 // what's possible.
 static uint8_t msgid = 0x00;
@@ -106,7 +95,7 @@ void sendIt(uint8_t msgid, uint16_t param) {
   using aidtopia::isQuery;
   using ID = aidtopia::Message::ID;
   using Feedback = aidtopia::Feedback;
-  using State = aidtopia::SerialAudio::State;
+  using State = SerialAudio::State;
 
   auto const id = static_cast<ID>(msgid);
 
@@ -118,6 +107,7 @@ void sendIt(uint8_t msgid, uint16_t param) {
   auto const timeout = isQuery(id) ? 100 : 30;
   audio.enqueue(id, param, feedback, state, timeout);
 }
+#endif
 
 class SpyHooks : public SerialAudio::Hooks {
   public:
@@ -234,6 +224,7 @@ void loop() {
   if (blue_button.update())     audio.loopFolder(47);  // no such folder.
   if (yellow_button.update())   audio.reset();
 
+#ifdef OLD_STATE
   while (Serial.available()) {
     char ch = Serial.read();
     switch (state) {
@@ -261,4 +252,5 @@ void loop() {
         break;
     }
   }
+#endif
 }

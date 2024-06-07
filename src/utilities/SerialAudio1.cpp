@@ -1,8 +1,5 @@
-// AidtopiaSerialAudio
-// Adrian McCarthy 2018-
-
 #include <Arduino.h>
-#include <AidtopiaSerialAudio.h>
+#include <utilities/SerialAudio1.h>
 #include <utilities/message.h>
 
 namespace aidtopia {
@@ -21,11 +18,10 @@ static constexpr uint8_t LSB(uint16_t word) {
 
 static bool isTimeout(Message const &msg) {
     return isError(msg) &&
-           msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::TIMEDOUT);
+           msg.getParam() == static_cast<uint16_t>(SerialAudio1::Error::TIMEDOUT);
 }
 
-
-void SerialAudio::update(Hooks *hooks) {
+void SerialAudio1::update(Hooks *hooks) {
     Message msg;
     if (m_core.update(&msg)) onEvent(msg, hooks);
     if (m_timeout.expired()) {
@@ -35,19 +31,19 @@ void SerialAudio::update(Hooks *hooks) {
     }
 }
 
-SerialAudio::Hooks::~Hooks() {}
-void SerialAudio::Hooks::onError(Error) {}
-void SerialAudio::Hooks::onQueryResponse(Parameter, uint16_t) {}
-void SerialAudio::Hooks::onDeviceChange(Device, DeviceChange) {}
-void SerialAudio::Hooks::onFinishedFile(Device, uint16_t) {}
-void SerialAudio::Hooks::onInitComplete(uint8_t) {}
+SerialAudio1::Hooks::~Hooks() {}
+void SerialAudio1::Hooks::onError(Error) {}
+void SerialAudio1::Hooks::onQueryResponse(Parameter, uint16_t) {}
+void SerialAudio1::Hooks::onDeviceChange(Device, DeviceChange) {}
+void SerialAudio1::Hooks::onFinishedFile(Device, uint16_t) {}
+void SerialAudio1::Hooks::onInitComplete(uint8_t) {}
 
-void SerialAudio::reset() {
+void SerialAudio1::reset() {
     m_queue.clear();
     enqueue(Message::ID::RESET, Feedback::FEEDBACK, State::RESETACKPENDING, 30);
 }
 
-void SerialAudio::queryFileCount(Device device) {
+void SerialAudio1::queryFileCount(Device device) {
     switch (device) {
         case Device::USB:    enqueue(Message::ID::USBFILECOUNT);   break;
         case Device::SDCARD: enqueue(Message::ID::SDFILECOUNT);    break;
@@ -56,83 +52,83 @@ void SerialAudio::queryFileCount(Device device) {
     }
 }
 
-void SerialAudio::queryFirmwareVersion() {
+void SerialAudio1::queryFirmwareVersion() {
     enqueue(Message::ID::FIRMWAREVERSION, Feedback::NO_FEEDBACK,
             State::RESPONSEPENDING, 100);
 }
 
-void SerialAudio::selectSource(Device source) {
+void SerialAudio1::selectSource(Device source) {
     auto const paramLo = static_cast<uint8_t>(source);
     enqueue(Message::ID::SELECTSOURCE, combine(0, paramLo), Feedback::FEEDBACK,
             State::SOURCEACKPENDING, 30);
 }
 
-void SerialAudio::queryStatus() {
+void SerialAudio1::queryStatus() {
     enqueue(Message::ID::STATUS, Feedback::NO_FEEDBACK,
             State::RESPONSEPENDING, 100);
 }
 
-void SerialAudio::setVolume(uint8_t volume) {
+void SerialAudio1::setVolume(uint8_t volume) {
     volume = min(volume, 30);
     enqueue(Message::ID::SETVOLUME, volume);
 }
 
-void SerialAudio::increaseVolume() {
+void SerialAudio1::increaseVolume() {
     enqueue(Message::ID::VOLUMEUP);
 }
 
-void SerialAudio::decreaseVolume() {
+void SerialAudio1::decreaseVolume() {
     enqueue(Message::ID::VOLUMEDOWN);
 }
 
-void SerialAudio::queryVolume() {
+void SerialAudio1::queryVolume() {
     enqueue(Message::ID::VOLUME, Feedback::NO_FEEDBACK,
             State::RESPONSEPENDING, 100);
 }
 
-void SerialAudio::setEqProfile(EqProfile eq) {
+void SerialAudio1::setEqProfile(EqProfile eq) {
     enqueue(Message::ID::SETEQPROFILE, static_cast<uint16_t>(eq));
 }
 
-void SerialAudio::queryEqProfile() {
+void SerialAudio1::queryEqProfile() {
     enqueue(Message::ID::EQPROFILE, Feedback::NO_FEEDBACK,
             State::RESPONSEPENDING, 100);
 }
 
-void SerialAudio::playFile(uint16_t index) {
+void SerialAudio1::playFile(uint16_t index) {
     enqueue(Message::ID::PLAYFILE, index);
 }
 
-void SerialAudio::playNextFile() {
+void SerialAudio1::playNextFile() {
     enqueue(Message::ID::PLAYNEXT);
 }
 
-void SerialAudio::playPreviousFile() {
+void SerialAudio1::playPreviousFile() {
     enqueue(Message::ID::PLAYPREVIOUS);
 }
 
-void SerialAudio::loopFile(uint16_t index) {
+void SerialAudio1::loopFile(uint16_t index) {
     enqueue(Message::ID::LOOPFILE, index);
 }
 
-void SerialAudio::loopAllFiles() {
+void SerialAudio1::loopAllFiles() {
     enqueue(Message::ID::LOOPALL);
 }
 
-void SerialAudio::playFilesInRandomOrder() {
+void SerialAudio1::playFilesInRandomOrder() {
     enqueue(Message::ID::RANDOMPLAY);
 }
 
-void SerialAudio::queryFolderCount() {
+void SerialAudio1::queryFolderCount() {
     enqueue(Message::ID::FOLDERCOUNT, Feedback::NO_FEEDBACK,
             State::RESPONSEPENDING, 100);
 }
 
-void SerialAudio::playTrack(uint16_t track) {
+void SerialAudio1::playTrack(uint16_t track) {
     enqueue(Message::ID::PLAYFROMMP3, track);
 }
 
-void SerialAudio::playTrack(uint16_t folder, uint16_t track) {
+void SerialAudio1::playTrack(uint16_t folder, uint16_t track) {
     if (track < 256) {
         auto const param = combine(
             static_cast<uint8_t>(folder),
@@ -145,7 +141,7 @@ void SerialAudio::playTrack(uint16_t folder, uint16_t track) {
     }
 }
 
-void SerialAudio::loopFolder(uint16_t folder) {
+void SerialAudio1::loopFolder(uint16_t folder) {
     // Note the longer timeout because the modules take a bit longer.  I think
     // the module checks the filesystem for the folder first.
     // Also note this command ACKs twice when successful.  I think one is for
@@ -155,7 +151,7 @@ void SerialAudio::loopFolder(uint16_t folder) {
             State::EXTRAACKPENDING, 100);
 }
 
-void SerialAudio::queryCurrentFile(Device device) {
+void SerialAudio1::queryCurrentFile(Device device) {
     auto msgid = Message::ID::NONE;
     switch (device) {
         case Device::USB:    msgid = Message::ID::CURRENTUSBFILE;   break;
@@ -166,44 +162,44 @@ void SerialAudio::queryCurrentFile(Device device) {
     enqueue(msgid, Feedback::NO_FEEDBACK, State::RESPONSEPENDING, 100);
 }
 
-void SerialAudio::queryPlaybackSequence() {
+void SerialAudio1::queryPlaybackSequence() {
     enqueue(Message::ID::PLAYBACKSEQUENCE, Feedback::NO_FEEDBACK,
             State::RESPONSEPENDING, 100);
 }
 
 
-void SerialAudio::stop() {
+void SerialAudio1::stop() {
     enqueue(Message::ID::STOP);
 }
 
-void SerialAudio::pause() {
+void SerialAudio1::pause() {
     enqueue(Message::ID::PAUSE);
 }
 
-void SerialAudio::unpause() {
+void SerialAudio1::unpause() {
     enqueue(Message::ID::UNPAUSE);
 }
 
 
-void SerialAudio::insertAdvert(uint16_t track) {
+void SerialAudio1::insertAdvert(uint16_t track) {
     enqueue(Message::ID::INSERTADVERT, track);
 }
 
-void SerialAudio::insertAdvert(uint8_t folder, uint8_t track) {
+void SerialAudio1::insertAdvert(uint8_t folder, uint8_t track) {
     if (folder == 0) return insertAdvert(track);
     enqueue(Message::ID::INSERTADVERTN, combine(folder, track));
 }
 
-void SerialAudio::stopAdvert() {
+void SerialAudio1::stopAdvert() {
     enqueue(Message::ID::STOPADVERT);
 }
 
-void SerialAudio::enqueue(Command const &cmd) {
+void SerialAudio1::enqueue(Command const &cmd) {
     m_queue.pushBack(cmd);
     if (m_state == State::READY) dispatch();
 }
 
-void SerialAudio::enqueue(
+void SerialAudio1::enqueue(
     Message::ID msgid, uint16_t data,
     Feedback feedback,
     State state,
@@ -212,7 +208,7 @@ void SerialAudio::enqueue(
     enqueue(Command{Message{msgid, data}, feedback, state, timeout});
 }
 
-void SerialAudio::enqueue(
+void SerialAudio1::enqueue(
     Message::ID msgid,
     Feedback feedback,
     State state,
@@ -221,16 +217,16 @@ void SerialAudio::enqueue(
     enqueue(msgid, 0, feedback, state, timeout);
 }
 
-void SerialAudio::enqueue(Message const &msg) {
+void SerialAudio1::enqueue(Message const &msg) {
     Command cmd = {msg, Feedback::FEEDBACK, State::ACKPENDING, 33};
     enqueue(cmd);
 }
 
-void SerialAudio::enqueue(Message::ID msgid, uint16_t data) {
+void SerialAudio1::enqueue(Message::ID msgid, uint16_t data) {
     enqueue(Message{msgid, data});
 }
 
-void SerialAudio::dispatch() {
+void SerialAudio1::dispatch() {
     if (m_queue.empty()) return;
     auto const &cmd = m_queue.peekFront();
     sendMessage(cmd.msg, cmd.feedback);
@@ -239,7 +235,7 @@ void SerialAudio::dispatch() {
     m_queue.popFront();
 }
 
-void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
+void SerialAudio1::onEvent(Message const &msg, Hooks *hooks) {
     using ID = Message::ID;
 
     if (isAsyncNotification(msg.getID())) {
@@ -373,7 +369,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 m_timeout.set(300);
             } else if (isError(msg)) {
                 if (hooks != nullptr) {
-                    hooks->onError(static_cast<SerialAudio::Error>(msg.getParam()));
+                    hooks->onError(static_cast<SerialAudio1::Error>(msg.getParam()));
                 }
                 m_state = State::STUCK;
             } else {
@@ -428,7 +424,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
                 m_state = State::STUCK;
             } else if (isError(msg)) {
                 if (hooks != nullptr) {
-                    hooks->onError(static_cast<SerialAudio::Error>(msg.getParam()));
+                    hooks->onError(static_cast<SerialAudio1::Error>(msg.getParam()));
                 }
                 m_state = State::STUCK;
             } else {
@@ -478,7 +474,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
     }
 }
 
-void SerialAudio::onPowerUp() {
+void SerialAudio1::onPowerUp() {
     // I used to just hit the module with a reset command on powerup, but
     // documentation and experience suggests that the device might not tolerate
     // a reset while already resetting.  So we'll assume the device is powering
@@ -493,40 +489,15 @@ void SerialAudio::onPowerUp() {
     Serial.println(F("onPowerUp: Waiting for INITCOMPLETE."));
 }
 
-void SerialAudio::ready() {
+void SerialAudio1::ready() {
     m_timeout.cancel();
     m_state = State::READY;
     dispatch();
 }
 
-void SerialAudio::sendMessage(Message const &msg, Feedback feedback) {
+void SerialAudio1::sendMessage(Message const &msg, Feedback feedback) {
     m_core.send(msg, feedback);
     m_lastRequest = msg.getID();
 }
 
-#if 0
-void printModuleStateName(ModuleState state) {
-  switch (state) {
-    case MS_STOPPED: Serial.print(F("Stopped")); break;
-    case MS_PLAYING: Serial.print(F("Playing")); break;
-    case MS_PAUSED:  Serial.print(F("Paused"));  break;
-    case MS_ASLEEP:  Serial.print(F("Asleep"));  break;
-    default:         Serial.print(F("???"));     break;
-  }
 }
-
-void printSequenceName(Sequence seq) {
-  switch (seq) {
-    case SEQ_LOOPALL:    Serial.print(F("Loop All")); break;
-    case SEQ_LOOPFOLDER: Serial.print(F("Loop Folder")); break;
-    case SEQ_LOOPTRACK:  Serial.print(F("Loop Track")); break;
-    case SEQ_RANDOM:     Serial.print(F("Random")); break;
-    case SEQ_SINGLE:     Serial.print(F("Single")); break;
-    default:             Serial.print(F("???")); break;
-  }
-}
-#endif
-
-}
-
-
