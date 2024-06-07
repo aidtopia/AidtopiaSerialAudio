@@ -49,7 +49,7 @@ Button green_button;
 Button blue_button;
 Button yellow_button;
 
-void startAudio() {
+void setUpAudio() {
   // It's a good idea to explicitly select your input source.
   audio.selectSource(SerialAudio::Device::SDCARD);
   
@@ -148,21 +148,25 @@ class SpyHooks : public SerialAudio::Hooks {
           Serial.println(value);
           break;
         default:
-          Serial.println(F("Ignoring query response."));
           break;
       }
     }
 
     void onInitComplete(uint8_t devices) override {
-      Serial.println(F("Module has just reset."));
-      Serial.print(F("Device(s) online: "));
-      if (devices & static_cast<uint8_t>(Device::USB))    Serial.print(F("USB "));
-      if (devices & static_cast<uint8_t>(Device::SDCARD)) Serial.print(F("SD "));
-      if (devices & static_cast<uint8_t>(Device::FLASH))  Serial.print(F("FLASH "));
+      static constexpr Device all_devices[] =
+        {Device::USB, Device::SDCARD, Device::FLASH};
+      Serial.print(F("Device(s) online:"));
+      for (auto const &device : all_devices) {
+        auto const mask = static_cast<uint8_t>(device);
+        if ((devices & mask) == mask) {
+          Serial.print(' ');
+          printDeviceName(device);
+        }
+      }
       Serial.println();
 
       Serial.println(F("Issuing commands to set up the module."));
-      startAudio();
+      setUpAudio();
     }
 
   private:

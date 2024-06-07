@@ -82,6 +82,11 @@ class Message {
         explicit Message(Message::ID id, uint16_t data = 0) :
             m_id(id), m_data(data) {}
 
+        void clear() { m_id = ID::NONE; m_data = 0; }
+        bool operator==(Message const &rhs) const {
+            return m_id == rhs.m_id && m_data == rhs.m_data;
+        }
+
         Message::ID getID()      const { return m_id; }
         uint16_t    getParam()   const { return m_data; }
 

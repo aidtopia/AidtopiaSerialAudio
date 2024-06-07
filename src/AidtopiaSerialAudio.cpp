@@ -239,13 +239,19 @@ void SerialAudio::dispatch() {
     m_queue.popFront();
 }
 
-
 void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
     using ID = Message::ID;
 
     if (isAsyncNotification(msg.getID())) {
-        Serial.println(F("Asynchronous notification received."));
         if (hooks != nullptr) {
+            if (msg == m_lastNotification) {
+                // Some notifications arrive twice in a row, but we don't want
+                // to confuse the client by calling back.
+                m_lastNotification.clear();
+                Serial.println(F("Duplicate notification suppressed."));
+                return;
+            }
+            m_lastNotification = msg;
             switch (msg.getID()) {
                 case ID::DEVICEINSERTED:
                     hooks->onDeviceChange(static_cast<Device>(msg.getParam()),
@@ -481,6 +487,7 @@ void SerialAudio::onPowerUp() {
     // the module is already online and to discover what devices are attached.
     m_queue.clear();
     m_lastRequest = Message::ID::NONE;
+    m_lastNotification.clear();
     m_state = State::POWERUPINITPENDING;
     m_timeout.set(3000);
     Serial.println(F("onPowerUp: Waiting for INITCOMPLETE."));

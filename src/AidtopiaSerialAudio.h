@@ -236,6 +236,7 @@ class SerialAudio {
 
         SerialAudioCore         m_core;
         Message::ID             m_lastRequest = Message::ID::NONE;
+        Message                 m_lastNotification;
         State                   m_state = State::POWERUPINITPENDING;
         Timeout<MillisClock>    m_timeout;
         Queue<Command>          m_queue;
