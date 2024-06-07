@@ -4,7 +4,7 @@
 namespace aidtopia {
 
 // A ring-buffer based queue with a maximum of 8 elements.
-template <typename T>
+template <typename T, uint8_t CAPACITY=8>
 class Queue {
     public:
         Queue() { clear(); }
@@ -37,7 +37,8 @@ class Queue {
         }
 
     private:
-        static constexpr uint8_t CAPACITY = 8;
+        static_assert(2 <= CAPACITY && CAPACITY <= 8);
+
         T       m_buffer[CAPACITY];
         uint8_t m_head : 3;  // log_2(CAPACITY)
         uint8_t m_tail : 3;  // log_2(CAPACITY)

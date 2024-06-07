@@ -72,8 +72,8 @@ void setup() {
   Serial.println(sizeof(aidtopia::SerialAudioCore));
   Serial.print(F("sizeof(aidtopia::MessageBuffer) = "));
   Serial.println(sizeof(aidtopia::MessageBuffer));
-  Serial.print(F("sizeof(aidtopia::Queue<SerialAudio::Command>) = "));
-  Serial.println(sizeof(aidtopia::Queue<SerialAudio::Command>));
+  Serial.print(F("sizeof(aidtopia::Queue<SerialAudio::Command, 6>) = "));
+  Serial.println(sizeof(aidtopia::Queue<SerialAudio::Command, 6>));
   Serial.print(F("sizeof(aidtopia::SerialAudio::Command) = "));
   Serial.println(sizeof(aidtopia::SerialAudio::Command));
   Serial.print(F("sizeof(aidtopia::Message) = "));

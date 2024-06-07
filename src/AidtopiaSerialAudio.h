@@ -235,7 +235,7 @@ class SerialAudio {
         void sendMessage(Message const &msg, Feedback feedback);
 
         SerialAudioCore         m_core;
-        Queue<Command>          m_queue;
+        Queue<Command, 6>       m_queue;
         Message::ID             m_lastRequest = Message::ID::NONE;
         Message                 m_lastNotification;
         Timeout<MillisClock>    m_timeout;
