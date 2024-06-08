@@ -123,6 +123,9 @@ inline bool isQuery(Message const &msg) { return isQuery(msg.getID()); }
 inline bool isQueryResponse(Message::ID id) { return isQuery(id); }
 inline bool isQueryResponse(Message const &msg) { return isQuery(msg.getID()); }
 
+inline bool isInitComplete(Message::ID id) { return id == Message::ID::INITCOMPLETE; }
+inline bool isInitComplete(Message const &msg) { return isInitComplete(msg.getID()); }
+
 }
 
 #endif

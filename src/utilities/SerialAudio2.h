@@ -191,27 +191,27 @@ class SerialAudio2 {
     void enableDACs();
 #endif
 
-    // This will become private:
+    private:
         using State2 = uint16_t;
         // The low byte of a State2 is the ID of the last message we sent to the
         // audio module.  The upper byte contains flags that the state machine
         // (in onEvent) uses to track the progress of the command or query.
         // Whenever all of the flag bits are clear, the state is READY, which
         // means the next command from the queue may be dispatched.
-        enum {
-            READY           = 0x0000,
-
+        enum : State2 {
             EXPECT_ACK      = 0x0100,
             EXPECT_ACK2     = 0x0200,
             EXPECT_RESPONSE = 0x0400,
-            EXPECT_INIT     = 0x0800,
-            RESET           = 0x1000,
-            DELAY           = 0x2000,
+            DELAY           = 0x0800,
+            RESERVED4       = 0x1000,
+            RESERVED3       = 0x2000,
             RESERVED2       = 0x4000,
             RESERVED1       = 0x8000,
             
             MSGID_MASK      = 0x00FF,
-            READY_MASK      = 0xFF00
+            FLAGS_MASK      = 0xFF00,
+            
+            POWERING_UP     = 0x0000
         };
 
         struct Command2 {
@@ -220,14 +220,13 @@ class SerialAudio2 {
         };
 
         void enqueue(State2 state, uint16_t data = 0);
-
         void onEvent(Message const &msg, Hooks *hooks);
-        
-    private:
         void dispatch();
         void dispatch(Command2 const &cmd);
+        Message::ID lastSent() const {
+                return static_cast<Message::ID>(m_state & MSGID_MASK);
+        }
         void onPowerUp();
-        void ready();
         void sendMessage(Message const &msg, Feedback feedback);
 
         SerialAudioCore         m_core;

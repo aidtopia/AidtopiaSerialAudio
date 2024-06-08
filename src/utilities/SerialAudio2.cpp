@@ -203,7 +203,7 @@ void SerialAudio2::dispatch() {
 void SerialAudio2::dispatch(Command2 const &cmd) {
     m_state = cmd.state;
     auto const msgid = static_cast<Message::ID>(m_state & MSGID_MASK);
-    sendMessage(Message(msgid, cmd.param), (m_state & EXPECT_ACK) ? Feedback::FEEDBACK : Feedback::NO_FEEDBACK);
+    sendMessage(Message{msgid, cmd.param}, (m_state & EXPECT_ACK) ? Feedback::FEEDBACK : Feedback::NO_FEEDBACK);
     m_timeout.set(100);
 }
 
@@ -219,7 +219,6 @@ void SerialAudio2::onEvent(Message const &msg, Hooks *hooks) {
     if (m_state & EXPECT_ACK)       Serial.print(F(" | EXPECT_ACK"));
     if (m_state & EXPECT_ACK2)      Serial.print(F(" | EXPECT_ACK2"));
     if (m_state & EXPECT_RESPONSE)  Serial.print(F(" | EXPECT_RESPONSE"));
-    if (m_state & EXPECT_INIT)      Serial.print(F(" | EXPECT_INIT"));
     if (m_state & DELAY)            Serial.print(F(" | DELAY"));
     Serial.println();
 
@@ -261,7 +260,7 @@ void SerialAudio2::onEvent(Message const &msg, Hooks *hooks) {
     if (isAck(msg)) {
         if (m_state & EXPECT_ACK2) {
             m_state &= ~EXPECT_ACK2;
-            m_timeout.set(100);
+            m_timeout.set(100);  // set longer timeout for second ACK
             return;
         }
         if (m_state & EXPECT_ACK) {
@@ -271,25 +270,39 @@ void SerialAudio2::onEvent(Message const &msg, Hooks *hooks) {
         }
     }
 
-    if (msg.getID() == ID::INITCOMPLETE) {
-        if (!(m_state & EXPECT_INIT)) {
-            Serial.println(F("Audio module unexpectedly reset!"));
-            m_queue.clear();
+    if (isInitComplete(msg)) {
+        if (m_state == POWERING_UP) {
+            Serial.println(F("Got INITCOMPLETE on power up"));
+            m_timeout.cancel();
+            if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
+            return;
         }
+        if (lastSent() == ID::RESET) {
+            Serial.println(F("Reset completed"));
+            if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
+            return;
+        }
+        if (lastSent() == ID::INITCOMPLETE) {
+            Serial.println(F("OMG! INITCOMPLETE worked as a query!"));
+            m_state &= ~EXPECT_RESPONSE;
+            if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
+            return;
+        }
+        Serial.println(F("Audio module unexpectedly reset!"));
+        m_queue.clear();
         if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
-        m_state &= ~EXPECT_INIT;
-        m_timeout.cancel();
+
         return;
     }
     
     if (isTimeout(msg)) {
-        Serial.println(F("Timed Out"));
         m_timeout.cancel();
         if (m_state & DELAY) {
+            Serial.println(F("Delay completed"));
             m_state &= ~DELAY;
             return;
         }
-        if ((m_state & EXPECT_INIT) && ((m_state & MSGID_MASK) != static_cast<uint8_t>(ID::RESET))) {
+        if (m_state == POWERING_UP) {
             Serial.println(F("Didn't receive INITCOMPLETE on powerup."));
             dispatch(Command2{static_cast<uint16_t>(ID::STATUS) | EXPECT_RESPONSE, 0});
             return;
@@ -310,17 +323,16 @@ void SerialAudio2::onEvent(Message const &msg, Hooks *hooks) {
             Serial.println(F("Got different query response than expected"));
             return;
         }
-        if (msg.getID() == Message::ID::RESET) {
-        }
         Serial.println(F("Got unexpected query response!"));
         return;
     }
     
     if (isError(msg)) {
         m_timeout.cancel();
-        if (hooks != nullptr) hooks->onError(static_cast<SerialAudio2::Error>(msg.getParam()));
         m_state &= MSGID_MASK;
-        dispatch();
+        if (hooks != nullptr) {
+            hooks->onError(static_cast<SerialAudio2::Error>(msg.getParam()));
+        }
         return;
     }
 }
@@ -334,20 +346,14 @@ void SerialAudio2::onPowerUp() {
     // the module is already online and to discover what devices are attached.
     m_queue.clear();
     m_lastNotification.clear();
-    m_state = static_cast<uint8_t>(Message::ID::NONE) | EXPECT_INIT;
+    m_state = POWERING_UP;
     m_timeout.set(3000);
     Serial.println(F("onPowerUp: Waiting for INITCOMPLETE."));
 }
 
-void SerialAudio2::ready() {
-    m_timeout.cancel();
-    m_state = READY;
-    dispatch();
-}
-
 void SerialAudio2::sendMessage(Message const &msg, Feedback feedback) {
     m_core.send(msg, feedback);
-    m_state = (m_state & READY_MASK) | static_cast<uint8_t>(msg.getID());
+    m_state = (m_state & FLAGS_MASK) | static_cast<uint8_t>(msg.getID());
 }
 
 }
