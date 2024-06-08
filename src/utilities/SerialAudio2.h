@@ -193,13 +193,20 @@ class SerialAudio2 {
 
     // This will become private:
         using State2 = uint16_t;
+        // The low byte of a State2 is the ID of the last message we sent to the
+        // audio module.  The upper byte contains flags that the state machine
+        // (in onEvent) uses to track the progress of the command or query.
+        // Whenever all of the flag bits are clear, the state is READY, which
+        // means the next command from the queue may be dispatched.
         enum {
+            READY           = 0x0000,
+
             EXPECT_ACK      = 0x0100,
             EXPECT_ACK2     = 0x0200,
             EXPECT_RESPONSE = 0x0400,
             EXPECT_INIT     = 0x0800,
-            DELAY           = 0x1000,
-            RESERVED3       = 0x2000,
+            RESET           = 0x1000,
+            DELAY           = 0x2000,
             RESERVED2       = 0x4000,
             RESERVED1       = 0x8000,
             
@@ -218,6 +225,7 @@ class SerialAudio2 {
         
     private:
         void dispatch();
+        void dispatch(Command2 const &cmd);
         void onPowerUp();
         void ready();
         void sendMessage(Message const &msg, Feedback feedback);
@@ -225,7 +233,6 @@ class SerialAudio2 {
         SerialAudioCore         m_core;
         Queue<Command2, 4>      m_queue;
         State2                  m_state = 0;
-        Message::ID             m_lastRequest = Message::ID::NONE;
         Message                 m_lastNotification;
         Timeout<MillisClock>    m_timeout;
 };

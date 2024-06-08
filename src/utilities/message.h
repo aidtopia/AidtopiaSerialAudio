@@ -108,7 +108,7 @@ inline bool isAsyncNotification(Message const &msg) {
 }
 
 inline bool isAck(Message::ID id) { return id == Message::ID::ACK; }
-inline bool IsAck(Message const &msg) { return isAck(msg.getID()); }
+inline bool isAck(Message const &msg) { return isAck(msg.getID()); }
 
 inline bool isError(Message::ID id) { return id == Message::ID::ERROR; }
 inline bool isError(Message const &msg) { return isError(msg.getID()); }
