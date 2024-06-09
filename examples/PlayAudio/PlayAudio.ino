@@ -225,12 +225,12 @@ class SpyHooks : public SerialAudio::Hooks {
 void loop() {
   audio.update(&hooks);
 
-#ifdef OLD_STATE
   if (red_button.update())      audio.stop();
   if (green_button.update())    audio.loopFolder(1);
   if (blue_button.update())     audio.loopFolder(47);  // no such folder.
   if (yellow_button.update())   audio.reset();
 
+#ifdef OLD_STATE
   while (Serial.available()) {
     char ch = Serial.read();
     switch (state) {

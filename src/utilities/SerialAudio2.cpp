@@ -45,17 +45,19 @@ void SerialAudio2::reset() {
 }
 
 void SerialAudio2::queryFileCount(Device device) {
+    // TODO: We need to ensure these get a longer timeout.
+    Message::ID msgid;
     switch (device) {
-        case Device::USB:    /*enqueue(Message::ID::USBFILECOUNT);   */ break;
-        case Device::SDCARD: /*enqueue(Message::ID::SDFILECOUNT);    */ break;
-        case Device::FLASH:  /*enqueue(Message::ID::FLASHFILECOUNT); */ break;
-        default: break;
+        case Device::USB:    msgid = Message::ID::USBFILECOUNT;    break;
+        case Device::SDCARD: msgid = Message::ID::SDFILECOUNT;     break;
+        case Device::FLASH:  msgid = Message::ID::FLASHFILECOUNT;  break;
+        default:  return;
     }
+    enqueue(msgid, State2::EXPECT_RESPONSE);
 }
 
 void SerialAudio2::queryFirmwareVersion() {
-//    enqueue(Message::ID::FIRMWAREVERSION, Feedback::NO_FEEDBACK,
-//            State::RESPONSEPENDING, 100);
+    enqueue(Message::ID::FIRMWAREVERSION, State2::EXPECT_RESPONSE);
 }
 
 void SerialAudio2::selectSource(Device source) {
@@ -65,26 +67,25 @@ void SerialAudio2::selectSource(Device source) {
 }
 
 void SerialAudio2::queryStatus() {
-//    enqueue(Message::ID::STATUS, Feedback::NO_FEEDBACK,
-//            State::RESPONSEPENDING, 100);
+    // TODO:  Might need a longer timeout.
+    enqueue(Message::ID::STATUS, State2::EXPECT_RESPONSE);
 }
 
-void SerialAudio2::setVolume(uint8_t /*volume*/) {
-//    volume = min(volume, 30);
-//    enqueue(Message::ID::SETVOLUME, volume);
+void SerialAudio2::setVolume(uint8_t volume) {
+    volume = min(volume, 30);
+    enqueue(Message::ID::SETVOLUME, State2::EXPECT_ACK, volume);
 }
 
 void SerialAudio2::increaseVolume() {
-//    enqueue(Message::ID::VOLUMEUP);
+    enqueue(Message::ID::VOLUMEUP, State2::EXPECT_ACK);
 }
 
 void SerialAudio2::decreaseVolume() {
-//    enqueue(Message::ID::VOLUMEDOWN);
+    enqueue(Message::ID::VOLUMEDOWN, State2::EXPECT_ACK);
 }
 
 void SerialAudio2::queryVolume() {
-//    enqueue(Message::ID::VOLUME, Feedback::NO_FEEDBACK,
-//            State::RESPONSEPENDING, 100);
+    enqueue(Message::ID::VOLUME, State2::EXPECT_RESPONSE);
 }
 
 void SerialAudio2::setEqProfile(EqProfile /*eq*/) {
@@ -92,8 +93,7 @@ void SerialAudio2::setEqProfile(EqProfile /*eq*/) {
 }
 
 void SerialAudio2::queryEqProfile() {
-//    enqueue(Message::ID::EQPROFILE, Feedback::NO_FEEDBACK,
-//            State::RESPONSEPENDING, 100);
+    enqueue(Message::ID::EQPROFILE, State2::EXPECT_RESPONSE);
 }
 
 void SerialAudio2::playFile(uint16_t /*index*/) {
@@ -121,35 +121,32 @@ void SerialAudio2::playFilesInRandomOrder() {
 }
 
 void SerialAudio2::queryFolderCount() {
-//    enqueue(Message::ID::FOLDERCOUNT, Feedback::NO_FEEDBACK,
-//            State::RESPONSEPENDING, 100);
+    enqueue(Message::ID::FOLDERCOUNT, State2::EXPECT_RESPONSE);
 }
 
-void SerialAudio2::playTrack(uint16_t /*track*/) {
-//    enqueue(Message::ID::PLAYFROMMP3, track);
+void SerialAudio2::playTrack(uint16_t track) {
+    enqueue(Message::ID::PLAYFROMMP3, State2::EXPECT_ACK, track);
 }
 
-void SerialAudio2::playTrack(uint16_t /*folder*/, uint16_t /*track*/) {
-//    if (track < 256) {
-//        auto const param = combine(
-//            static_cast<uint8_t>(folder),
-//            static_cast<uint8_t>(track)
-//        );
-//        enqueue(Message::ID::PLAYFROMFOLDER, param);
-//    } else if (folder < 16) {
-//        auto const param = ((folder & 0x0F) << 12) | (track & 0x0FFF);
-//        enqueue(Message::ID::PLAYFROMBIGFOLDER, param);
-//    }
+void SerialAudio2::playTrack(uint16_t folder, uint16_t track) {
+    if (track < 256) {
+        auto const param = combine(
+            static_cast<uint8_t>(folder),
+            static_cast<uint8_t>(track)
+        );
+        enqueue(Message::ID::PLAYFROMFOLDER, State2::EXPECT_ACK, param);
+    } else if (folder < 16) {
+        auto const param = ((folder & 0x0F) << 12) | (track & 0x0FFF);
+        enqueue(Message::ID::PLAYFROMBIGFOLDER, State2::EXPECT_ACK, param);
+    }
 }
 
-void SerialAudio2::loopFolder(uint16_t /*folder*/) {
-    // Note the longer timeout because the modules take a bit longer.  I think
-    // the module checks the filesystem for the folder first.
-    // Also note this command ACKs twice when successful.  I think one is for
+void SerialAudio2::loopFolder(uint16_t folder) {
+    // Note that this command ACKs twice when successful.  I think one is for
     // the command to put it into loop folder mode and the second is when it
     // actually begins playing.
-//    enqueue(Message::ID::LOOPFOLDER, folder, Feedback::FEEDBACK,
-//            State::EXTRAACKPENDING, 100);
+    enqueue(Message::ID::LOOPFOLDER, State2::EXPECT_ACK | State2::EXPECT_ACK2,
+            folder);
 }
 
 void SerialAudio2::queryCurrentFile(Device /*device*/) {
@@ -164,23 +161,21 @@ void SerialAudio2::queryCurrentFile(Device /*device*/) {
 }
 
 void SerialAudio2::queryPlaybackSequence() {
-//    enqueue(Message::ID::PLAYBACKSEQUENCE, Feedback::NO_FEEDBACK,
-//            State::RESPONSEPENDING, 100);
+    enqueue(Message::ID::PLAYBACKSEQUENCE, State2::EXPECT_RESPONSE);
 }
 
 
 void SerialAudio2::stop() {
-//    enqueue(Message::ID::STOP);
+    enqueue(Message::ID::STOP, State2::EXPECT_ACK);
 }
 
 void SerialAudio2::pause() {
-//    enqueue(Message::ID::PAUSE);
+    enqueue(Message::ID::PAUSE, State2::EXPECT_ACK);
 }
 
 void SerialAudio2::unpause() {
-//    enqueue(Message::ID::UNPAUSE);
+    enqueue(Message::ID::UNPAUSE, State2::EXPECT_ACK);
 }
-
 
 void SerialAudio2::insertAdvert(uint16_t /*track*/) {
 //    enqueue(Message::ID::INSERTADVERT, track);
@@ -192,7 +187,7 @@ void SerialAudio2::insertAdvert(uint8_t /*folder*/, uint8_t /*track*/) {
 }
 
 void SerialAudio2::stopAdvert() {
-//    enqueue(Message::ID::STOPADVERT);
+    enqueue(Message::ID::STOPADVERT, State2::EXPECT_ACK);
 }
 
 void SerialAudio2::dispatch() {
