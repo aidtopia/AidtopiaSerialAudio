@@ -41,7 +41,9 @@ void SerialAudio::Hooks::onInitComplete(uint8_t) {}
 
 void SerialAudio::reset() {
     m_queue.clear();
-    //enqueue(Message::ID::RESET, Feedback::FEEDBACK, State::RESETACKPENDING, 30);
+    m_lastNotification.clear();
+    dispatch(Message::ID::RESET, State::EXPECT_ACK | State::UNINITIALIZED);
+    m_timeout.set(3000);
 }
 
 void SerialAudio::queryFileCount(Device device) {
