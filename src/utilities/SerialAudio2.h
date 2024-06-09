@@ -206,12 +206,12 @@ class SerialAudio2 {
             RESERVED4       = 0x1000,
             RESERVED3       = 0x2000,
             RESERVED2       = 0x4000,
-            RESERVED1       = 0x8000,
+            UNINITIALIZED   = 0x8000,
             
             MSGID_MASK      = 0x00FF,
             FLAGS_MASK      = 0xFF00,
             
-            POWERING_UP     = 0x0000
+            POWERING_UP     = UNINITIALIZED
         };
 
         struct Command2 {
@@ -219,19 +219,19 @@ class SerialAudio2 {
             uint16_t param;
         };
 
-        void enqueue(State2 state, uint16_t data = 0);
+        void enqueue(Message::ID msgid, State2 flags, uint16_t data = 0);
+        bool ready() const { return (m_state & FLAGS_MASK) == 0; }
         void onEvent(Message const &msg, Hooks *hooks);
         void dispatch();
         void dispatch(Command2 const &cmd);
         Message::ID lastSent() const {
-                return static_cast<Message::ID>(m_state & MSGID_MASK);
+            return static_cast<Message::ID>(m_state & MSGID_MASK);
         }
         void onPowerUp();
-        void sendMessage(Message const &msg, Feedback feedback);
 
         SerialAudioCore         m_core;
         Queue<Command2, 4>      m_queue;
-        State2                  m_state = 0;
+        State2                  m_state = UNINITIALIZED;
         Message                 m_lastNotification;
         Timeout<MillisClock>    m_timeout;
 };
