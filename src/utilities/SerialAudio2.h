@@ -192,26 +192,48 @@ class SerialAudio2 {
 #endif
 
     private:
-        using State2 = uint16_t;
-        // The low byte of a State2 is the ID of the last message we sent to the
-        // audio module.  The upper byte contains flags that the state machine
-        // (in onEvent) uses to track the progress of the command or query.
-        // Whenever all of the flag bits are clear, the state is READY, which
-        // means the next command from the queue may be dispatched.
-        enum : State2 {
-            EXPECT_ACK      = 0x0100,
-            EXPECT_ACK2     = 0x0200,
-            EXPECT_RESPONSE = 0x0400,
-            DELAY           = 0x0800,
-            RESERVED4       = 0x1000,
-            RESERVED3       = 0x2000,
-            RESERVED2       = 0x4000,
-            UNINITIALIZED   = 0x8000,
-            
-            MSGID_MASK      = 0x00FF,
-            FLAGS_MASK      = 0xFF00,
-            
-            POWERING_UP     = UNINITIALIZED
+        // The state keeps track of the last message sent and a checklist of
+        // events to expect.
+        class State2 {
+            public:
+                using Flag = uint8_t;
+                enum : uint8_t {
+                    NONE            = 0x00,
+                    EXPECT_ACK      = 0x01,
+                    EXPECT_ACK2     = 0x02,
+                    EXPECT_RESPONSE = 0x04,
+                    DELAY           = 0x08,
+                    RESERVED4       = 0x10,
+                    RESERVED3       = 0x20,
+                    RESERVED2       = 0x40,
+                    UNINITIALIZED   = 0x80,
+                    
+                    ALL_FLAGS       = 0xFF
+                };
+
+                State2() : m_sent(Message::ID::NONE), m_flags(UNINITIALIZED) {}
+                explicit State2(Message::ID msgid, Flag flags = NONE) :
+                    m_sent(msgid), m_flags(flags) {}
+
+                Message::ID sent() const { return m_sent; }
+                bool has(Flag flag) const { return (m_flags & flag) == flag; }
+                bool hasAny(Flag flags) const { return (m_flags & flags) != 0; }
+                void set(Flag flags) { m_flags |= flags; }
+                void clear(Flag flags) { m_flags &= ~flags; }
+                bool testAndClear(Flag flag) {
+                    if (has(flag)) { clear(flag); return true; }
+                    return false;
+                }
+
+                bool ready() const { return m_flags == NONE; }
+                bool poweringUp() const {
+                    return m_sent == Message::ID::NONE &&
+                           m_flags == UNINITIALIZED;
+                }
+
+            private:
+                Message::ID m_sent;
+                uint8_t     m_flags;
         };
 
         struct Command2 {
@@ -219,19 +241,17 @@ class SerialAudio2 {
             uint16_t param;
         };
 
-        void enqueue(Message::ID msgid, State2 flags, uint16_t data = 0);
-        bool ready() const { return (m_state & FLAGS_MASK) == 0; }
+        void enqueue(Message::ID msgid, State2::Flag flags, uint16_t data = 0);
         void onEvent(Message const &msg, Hooks *hooks);
+        void handleEvent(Message const &msg, Hooks *hooks);
         void dispatch();
+        void dispatch(Message::ID msgid, State2::Flag flags, uint16_t data = 0);
         void dispatch(Command2 const &cmd);
-        Message::ID lastSent() const {
-            return static_cast<Message::ID>(m_state & MSGID_MASK);
-        }
         void onPowerUp();
-
+        
         SerialAudioCore         m_core;
         Queue<Command2, 4>      m_queue;
-        State2                  m_state = UNINITIALIZED;
+        State2                  m_state;
         Message                 m_lastNotification;
         Timeout<MillisClock>    m_timeout;
 };

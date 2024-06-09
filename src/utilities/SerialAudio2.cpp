@@ -29,7 +29,7 @@ void SerialAudio2::update(Hooks *hooks) {
             Message{Message::ID::ERROR, static_cast<uint16_t>(Error::TIMEDOUT)};
         onEvent(timeout, hooks);
     }
-    if (ready()) dispatch();
+    if (m_state.ready()) dispatch();
 }
 
 SerialAudio2::Hooks::~Hooks() {}
@@ -196,42 +196,52 @@ void SerialAudio2::stopAdvert() {
 }
 
 void SerialAudio2::dispatch() {
+    if (!m_state.ready()) return;
     if (m_queue.empty()) return;
-    if (m_state & UNINITIALIZED) return;
     dispatch(m_queue.peekFront());
     m_queue.popFront();
 }
 
+void SerialAudio2::dispatch(Message::ID msgid, State2::Flag flags, uint16_t data) {
+    dispatch(Command2{State2{msgid, flags}, data});
+}
+
 void SerialAudio2::dispatch(Command2 const &cmd) {
-    auto const msgid = static_cast<Message::ID>(cmd.state & MSGID_MASK);
     auto const feedback =
-        (cmd.state & EXPECT_ACK) ? Feedback::FEEDBACK : Feedback::NO_FEEDBACK;
-    m_core.send(Message{msgid, cmd.param}, feedback);
+        cmd.state.has(State2::EXPECT_ACK) ? Feedback::FEEDBACK :
+                                            Feedback::NO_FEEDBACK;
+    m_core.send(Message{cmd.state.sent(), cmd.param}, feedback);
     m_state = cmd.state;
     m_timeout.set(100);
 }
 
-void SerialAudio2::enqueue(Message::ID msgid, State2 flags, uint16_t data) {
-    auto const newState = static_cast<uint16_t>(msgid) | flags;
-    m_queue.pushBack(Command2{newState, data});
-    if (ready()) dispatch();
+void SerialAudio2::enqueue(Message::ID msgid, State2::Flag flags, uint16_t data) {
+    m_queue.pushBack(Command2{State2{msgid, flags}, data});
+    if (m_state.ready()) dispatch();
 }
 
 void SerialAudio2::onEvent(Message const &msg, Hooks *hooks) {
-    using ID = Message::ID;
-
     Serial.print(F("onEvent ("));
     Serial.print(static_cast<uint8_t>(msg.getID()), HEX);
     Serial.print(F(", "));
     Serial.print(msg.getParam(), HEX);
     Serial.print(F(") State="));
-    Serial.print(m_state & MSGID_MASK, HEX);
-    if (m_state & EXPECT_ACK)       Serial.print(F(" | EXPECT_ACK"));
-    if (m_state & EXPECT_ACK2)      Serial.print(F(" | EXPECT_ACK2"));
-    if (m_state & EXPECT_RESPONSE)  Serial.print(F(" | EXPECT_RESPONSE"));
-    if (m_state & DELAY)            Serial.print(F(" | DELAY"));
-    if (m_state & UNINITIALIZED)    Serial.print(F(" | UNINITIALIZED"));
+    Serial.print(static_cast<uint8_t>(m_state.sent()), HEX);
+    if (m_state.has(State2::EXPECT_ACK))       Serial.print(F(" | EXPECT_ACK"));
+    if (m_state.has(State2::EXPECT_ACK2))      Serial.print(F(" | EXPECT_ACK2"));
+    if (m_state.has(State2::EXPECT_RESPONSE))  Serial.print(F(" | EXPECT_RESPONSE"));
+    if (m_state.has(State2::DELAY))            Serial.print(F(" | DELAY"));
+    if (m_state.has(State2::UNINITIALIZED))    Serial.print(F(" | UNINITIALIZED"));
     Serial.println();
+    
+    handleEvent(msg, hooks);
+    
+    // We might be ready to dispatch a queued command now.
+    dispatch();
+}
+
+void SerialAudio2::handleEvent(Message const &msg, Hooks *hooks) {
+    using ID = Message::ID;
 
     if (isAsyncNotification(msg)) {
         if (hooks != nullptr) {
@@ -269,74 +279,74 @@ void SerialAudio2::onEvent(Message const &msg, Hooks *hooks) {
     }
     
     if (isAck(msg)) {
-        if (m_state & EXPECT_ACK2) {
-            m_state &= ~EXPECT_ACK2;
+        if (m_state.testAndClear(State2::EXPECT_ACK2)) {
             m_timeout.set(100);  // set longer timeout for second ACK
             return;
         }
-        if (m_state & EXPECT_ACK) {
-            m_state &= ~EXPECT_ACK;
-            m_timeout.cancel();
+        if (m_state.testAndClear(State2::EXPECT_ACK)) {
+            if (m_state.has(State2::DELAY)) {
+                m_timeout.set(300);
+            } else {
+                m_timeout.cancel();
+            }
             return;
         }
     }
 
     if (isInitComplete(msg)) {
-        if (m_state == POWERING_UP) {
+        if (m_state.poweringUp()) {
             Serial.println(F("Got INITCOMPLETE on power up"));
-            m_state &= ~UNINITIALIZED;
+            m_state.clear(State2::UNINITIALIZED);
             m_timeout.cancel();
             if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
             return;
         }
-        if (lastSent() == ID::RESET) {
+        if (m_state.sent() == ID::RESET) {
             Serial.println(F("Reset completed"));
-            m_state &= ~UNINITIALIZED;
+            m_state.clear(State2::UNINITIALIZED);
             m_timeout.cancel();
             if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
             return;
         }
-        if (lastSent() == ID::INITCOMPLETE) {
+        if (m_state.sent() == ID::INITCOMPLETE) {
             Serial.println(F("OMG! INITCOMPLETE worked as a query!"));
-            m_state &= ~EXPECT_RESPONSE;
+            m_state.clear(State2::EXPECT_RESPONSE);
             if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
             return;
         }
         Serial.println(F("Audio module unexpectedly reset!"));
-        m_state = 0;
+        m_state = State2{Message:ID::NONE};
         m_timeout.cancel();
         m_queue.clear();
+        m_lastNotification.clear();
         if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
         return;
     }
     
     if (isTimeout(msg)) {
         m_timeout.cancel();
-        if (m_state & DELAY) {
+        if (m_state.testAndClear(State2::DELAY)) {
             Serial.println(F("Delay completed"));
-            m_state &= ~DELAY;
             return;
         }
-        if (m_state == POWERING_UP) {
+        if (m_state.poweringUp()) {
             Serial.println(F("Didn't receive INITCOMPLETE on powerup."));
             // Let's try querying the module to see whether it's already running.
-            auto const newState = static_cast<uint16_t>(ID::STATUS) |
-                EXPECT_RESPONSE | UNINITIALIZED;
-            dispatch(Command2{newState, 0});
+            dispatch(ID::STATUS, State2::EXPECT_RESPONSE | State2::UNINITIALIZED);
             return;
         }
     }
     
     if (isQueryResponse(msg)) {
-        if (m_state & EXPECT_RESPONSE) {
-            if (msg.getID() == lastSent()) {
+        if (m_state.has(State2::EXPECT_RESPONSE)) {
+            if (msg.getID() == m_state.sent()) {
                 Serial.println(F("Received expected query response"));
                 m_timeout.cancel();
-                m_state &= ~EXPECT_RESPONSE;
-                if (msg.getID() == ID::STATUS && (m_state & UNINITIALIZED)) {
+                m_state.clear(State2::EXPECT_RESPONSE);
+                if (msg.getID() == ID::STATUS && m_state.has(State2::UNINITIALIZED)) {
                     // A valid response to a status query means we've detected a
                     // live audio module after powerup.
-                    m_state &= ~UNINITIALIZED;
+                    m_state.clear(State2::UNINITIALIZED);
                     if (hooks != nullptr) {
                         // The device given in the status message is a reasonble
                         // proxy for the set of storage devices attached.
@@ -360,7 +370,7 @@ void SerialAudio2::onEvent(Message const &msg, Hooks *hooks) {
     
     if (isError(msg)) {
         m_timeout.cancel();
-        m_state &= MSGID_MASK;
+        m_state.clear(State2::ALL_FLAGS);
         if (hooks != nullptr) {
             hooks->onError(static_cast<SerialAudio2::Error>(msg.getParam()));
         }
@@ -377,7 +387,7 @@ void SerialAudio2::onPowerUp() {
     // the module is already online and to discover what devices are attached.
     m_queue.clear();
     m_lastNotification.clear();
-    m_state = POWERING_UP;
+    m_state = State2();
     m_timeout.set(3000);
     Serial.println(F("onPowerUp: Waiting for INITCOMPLETE."));
 }

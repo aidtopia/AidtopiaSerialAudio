@@ -52,7 +52,7 @@ Button yellow_button;
 void setUpAudio() {
   // It's a good idea to explicitly select your input source.
   audio.selectSource(SerialAudio::Device::SDCARD);
-  
+
   // Queries will generate callbacks when the response is available.
   audio.queryFirmwareVersion();
   audio.queryEqProfile();
