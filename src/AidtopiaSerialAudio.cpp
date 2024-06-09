@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <utilities/SerialAudio2.h>
+#include <AidtopiaSerialAudio.h>
 #include <utilities/message.h>
 
 namespace aidtopia {
