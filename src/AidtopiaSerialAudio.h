@@ -7,7 +7,6 @@
 #ifndef AIDTOPIASERIALAUDIO_H
 #define AIDTOPIASERIALAUDIO_H
 
-#include <utilities/SerialAudio1.h>
 #include <utilities/SerialAudio2.h>
 
 #endif
