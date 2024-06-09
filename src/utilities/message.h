@@ -61,6 +61,7 @@ class Message {
             ACK               = 0x41,
 
             // Queries and their responses
+            DEVICESONLINE     = INITCOMPLETE,
             STATUS            = 0x42,
             VOLUME            = 0x43,
             EQPROFILE         = 0x44,
@@ -95,13 +96,15 @@ class Message {
         uint16_t    m_data = 0;
 };
 
-inline bool isCommand(Message::ID id) {
-    return 0x00 < static_cast<uint8_t>(id) && static_cast<uint8_t>(id) < 0x30;
+inline bool isCommand(Message::ID msgid) {
+    auto const id = static_cast<uint8_t>(msgid);
+    return 0x00 < id && id < 0x30;
 }
 inline bool isCommand(Message const &msg) { return isCommand(msg.getID()); }
 
-inline bool isAsyncNotification(Message::ID id) {
-    return 0x30 <= static_cast<uint8_t>(id) && static_cast<uint8_t>(id) < 0x3F;
+inline bool isAsyncNotification(Message::ID msgid) {
+    auto const id = static_cast<uint8_t>(msgid);
+    return 0x30 <= id && id < 0x3F;
 }
 inline bool isAsyncNotification(Message const &msg) {
     return isAsyncNotification(msg.getID());
@@ -113,10 +116,12 @@ inline bool isAck(Message const &msg) { return isAck(msg.getID()); }
 inline bool isError(Message::ID id) { return id == Message::ID::ERROR; }
 inline bool isError(Message const &msg) { return isError(msg.getID()); }
 
-inline bool isQuery(Message::ID id) {
-    return 0x42 <= static_cast<uint8_t>(id);
-    // Supposedly Message::ID::INITCOMPLETE (0x3F) can be a query, but I've not
-    // yet seen a module that supports that.
+inline bool isQuery(Message::ID msgid) {
+    // Supposedly 0x3F (normally a notification of a reset being completed) can
+    // be a query to determine which devices are attached.  I've not yet seen
+    // a module that supports it as a query, but we'll allow it.
+    if (msgid == Message::ID::DEVICESONLINE) return true;
+    return 0x42 <= static_cast<uint8_t>(msgid);
 }
 inline bool isQuery(Message const &msg) { return isQuery(msg.getID()); }
 

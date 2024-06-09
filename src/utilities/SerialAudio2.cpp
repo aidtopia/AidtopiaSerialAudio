@@ -58,10 +58,10 @@ void SerialAudio2::queryFirmwareVersion() {
 //            State::RESPONSEPENDING, 100);
 }
 
-void SerialAudio2::selectSource(Device /*source*/) {
-//    auto const paramLo = static_cast<uint8_t>(source);
-//    enqueue(Message::ID::SELECTSOURCE, combine(0, paramLo), Feedback::FEEDBACK,
-//            State::SOURCEACKPENDING, 30);
+void SerialAudio2::selectSource(Device source) {
+    auto const paramLo = static_cast<uint8_t>(source);
+    enqueue(Message::ID::SELECTSOURCE, State2::EXPECT_ACK | State2::DELAY,
+            combine(0, paramLo));
 }
 
 void SerialAudio2::queryStatus() {
@@ -212,7 +212,10 @@ void SerialAudio2::dispatch(Command2 const &cmd) {
                                             Feedback::NO_FEEDBACK;
     m_core.send(Message{cmd.state.sent(), cmd.param}, feedback);
     m_state = cmd.state;
-    m_timeout.set(100);
+    unsigned const duration =
+        m_state.has(State2::EXPECT_ACK)      ? 30  :
+        m_state.has(State2::EXPECT_RESPONSE) ? 100 : 0;
+    m_timeout.set(duration);
 }
 
 void SerialAudio2::enqueue(Message::ID msgid, State2::Flag flags, uint16_t data) {
@@ -244,10 +247,13 @@ void SerialAudio2::handleEvent(Message const &msg, Hooks *hooks) {
     using ID = Message::ID;
 
     if (isAsyncNotification(msg)) {
+        // TODO:  Consider what should happen if a device is inserted while
+        // we're in an uninitialized or a no-sources state.
+
         if (hooks != nullptr) {
             if (msg == m_lastNotification) {
                 // Some notifications arrive twice in a row, but we don't want
-                // to confuse the client by calling back.
+                // to confuse the client by calling back twice.
                 m_lastNotification.clear();
                 Serial.println(F("Duplicate notification suppressed."));
                 return;
@@ -279,18 +285,19 @@ void SerialAudio2::handleEvent(Message const &msg, Hooks *hooks) {
     }
     
     if (isAck(msg)) {
-        if (m_state.testAndClear(State2::EXPECT_ACK2)) {
-            m_timeout.set(100);  // set longer timeout for second ACK
-            return;
-        }
         if (m_state.testAndClear(State2::EXPECT_ACK)) {
-            if (m_state.has(State2::DELAY)) {
+            m_timeout.cancel();
+            if (m_state.hasAny(State2::EXPECT_ACK2 | State2::DELAY)) {
                 m_timeout.set(300);
-            } else {
-                m_timeout.cancel();
             }
             return;
         }
+        if (m_state.testAndClear(State2::EXPECT_ACK2)) {
+            m_timeout.cancel();
+            return;
+        }
+        Serial.println(F("Unexpected ACK!"));
+        return;
     }
 
     if (isInitComplete(msg)) {
@@ -311,6 +318,7 @@ void SerialAudio2::handleEvent(Message const &msg, Hooks *hooks) {
         if (m_state.sent() == ID::INITCOMPLETE) {
             Serial.println(F("OMG! INITCOMPLETE worked as a query!"));
             m_state.clear(State2::EXPECT_RESPONSE);
+            m_timeout.cancel();
             if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
             return;
         }
@@ -321,20 +329,6 @@ void SerialAudio2::handleEvent(Message const &msg, Hooks *hooks) {
         m_lastNotification.clear();
         if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
         return;
-    }
-    
-    if (isTimeout(msg)) {
-        m_timeout.cancel();
-        if (m_state.testAndClear(State2::DELAY)) {
-            Serial.println(F("Delay completed"));
-            return;
-        }
-        if (m_state.poweringUp()) {
-            Serial.println(F("Didn't receive INITCOMPLETE on powerup."));
-            // Let's try querying the module to see whether it's already running.
-            dispatch(ID::STATUS, State2::EXPECT_RESPONSE | State2::UNINITIALIZED);
-            return;
-        }
     }
     
     if (isQueryResponse(msg)) {
@@ -366,6 +360,21 @@ void SerialAudio2::handleEvent(Message const &msg, Hooks *hooks) {
         }
         Serial.println(F("Got unexpected query response!"));
         return;
+    }
+    
+    if (isTimeout(msg)) {
+        if (m_state.testAndClear(State2::DELAY)) {
+            Serial.println(F("Delay completed"));
+            m_timeout.cancel();
+            return;
+        }
+        if (m_state.poweringUp()) {
+            Serial.println(F("Didn't receive INITCOMPLETE on powerup."));
+            // Let's try querying the module to see whether it's already running.
+            dispatch(ID::STATUS, State2::EXPECT_RESPONSE | State2::UNINITIALIZED);
+            return;
+        }
+        // Fall through to the general error handler.
     }
     
     if (isError(msg)) {
