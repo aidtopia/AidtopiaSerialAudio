@@ -3,25 +3,6 @@
 using SerialAudio = aidtopia::SerialAudio;
 static SerialAudio audio;
 
-static constexpr int hexValue(char ch) {
-  return ('0' <= ch && ch <= '9') ? ch - '0' :
-         ('A' <= ch && ch <= 'F') ? ch - 'A' + 0xA :
-         ('a' <= ch && ch <= 'f') ? ch - 'a' + 0xA :
-         -1;
-}
-
-static constexpr bool isHexDigit(char ch) {
-  return hexValue(ch) >= 0;
-}
-
-template <typename T>
-bool applyHexDigit(char ch, T &value) {
-  if (!isHexDigit(ch)) return false;
-  value <<= 4;
-  value |= hexValue(ch);
-  return true;
-}
-
 class Button {
   public:
     void begin(uint8_t pin) {
@@ -83,31 +64,6 @@ void setup() {
   // You can issue audio commands now, and they'll queue up until the device
   // is ready.  Instead, we'll wait for the OnInitComplete callback.
 }
-
-#ifdef OLD_STATE
-// We'll let the user enter raw command numbers and parameters to explore
-// what's possible.
-static uint8_t msgid = 0x00;
-static uint16_t param = 0x0000;
-static int state = 0;
-
-void sendIt(uint8_t msgid, uint16_t param) {
-  using aidtopia::isQuery;
-  using ID = aidtopia::Message::ID;
-  using Feedback = aidtopia::Feedback;
-  using State = SerialAudio::State;
-
-  auto const id = static_cast<ID>(msgid);
-
-  Serial.println(F("--"));
-  auto const feedback = isQuery(id) ? Feedback::NO_FEEDBACK : Feedback::FEEDBACK;
-  auto const state =
-    isQuery(id) ? State::RESPONSEPENDING :
-                  State::ACKPENDING;
-  auto const timeout = isQuery(id) ? 100 : 30;
-  audio.enqueue(id, param, feedback, state, timeout);
-}
-#endif
 
 class SpyHooks : public SerialAudio::Hooks {
   public:
@@ -229,34 +185,4 @@ void loop() {
   if (green_button.update())    audio.loopFolder(1);
   if (blue_button.update())     audio.loopFolder(47);  // no such folder.
   if (yellow_button.update())   audio.reset();
-
-#ifdef OLD_STATE
-  while (Serial.available()) {
-    char ch = Serial.read();
-    switch (state) {
-      case 0:
-        msgid = 0; param = 0;
-        if (applyHexDigit(ch, msgid)) { state = 1; break; }
-        else                          { state = (ch == ' ') ? 0 : 999; break; }
-        break;
-      case 1:
-        if (applyHexDigit(ch, msgid)) { state = 2; break; }
-        [[fallthrough]];
-      case 2:
-        if (ch == '\n')               { sendIt(msgid, param); state = 0; break; }
-        else                          { state = (ch == ' ') ? 3 : 999; break; }
-        break;
-      case 3:
-        if (applyHexDigit(ch, param)) { break; }
-        [[fallthrough]];
-      case 4:
-        if (ch == '\n')               { sendIt(msgid, param); state = 0; break; }
-        else                          { state = (ch == ' ') ? 4 : 999; break; }
-        break;
-      default:
-        if (ch == '\n')               { state = 0; break; }
-        break;
-    }
-  }
-#endif
 }
