@@ -7,7 +7,7 @@
 
 namespace aidtopia {
 
-class SerialAudio2 {
+class SerialAudio {
     public:
         // From the client's point of view, these enumerations are just
         // arbitrary constants, but do not change any explicitly listed values.
@@ -105,10 +105,10 @@ class SerialAudio2 {
 
         class Hooks {
             public:
-                using Device = SerialAudio2::Device;
-                using DeviceChange = SerialAudio2::DeviceChange;
-                using Parameter = SerialAudio2::Parameter;
-                using Error = SerialAudio2::Error;
+                using Device = SerialAudio::Device;
+                using DeviceChange = SerialAudio::DeviceChange;
+                using Parameter = SerialAudio::Parameter;
+                using Error = SerialAudio::Error;
 
                 virtual ~Hooks();
 
@@ -194,7 +194,7 @@ class SerialAudio2 {
     private:
         // The state keeps track of the last message sent and a checklist of
         // events to expect.
-        class State2 {
+        class State {
             public:
                 using Flag = uint8_t;
                 enum : uint8_t {
@@ -211,8 +211,8 @@ class SerialAudio2 {
                     ALL_FLAGS       = 0xFF
                 };
 
-                State2() : m_sent(Message::ID::NONE), m_flags(UNINITIALIZED) {}
-                explicit State2(Message::ID msgid, Flag flags = NONE) :
+                State() : m_sent(Message::ID::NONE), m_flags(UNINITIALIZED) {}
+                explicit State(Message::ID msgid, Flag flags = NONE) :
                     m_sent(msgid), m_flags(flags) {}
 
                 Message::ID sent() const { return m_sent; }
@@ -236,22 +236,22 @@ class SerialAudio2 {
                 uint8_t     m_flags;
         };
 
-        struct Command2 {
-            State2 state;
+        struct Command {
+            State state;
             uint16_t param;
         };
 
-        void enqueue(Message::ID msgid, State2::Flag flags, uint16_t data = 0);
+        void enqueue(Message::ID msgid, State::Flag flags, uint16_t data = 0);
         void onEvent(Message const &msg, Hooks *hooks);
         void handleEvent(Message const &msg, Hooks *hooks);
         void dispatch();
-        void dispatch(Message::ID msgid, State2::Flag flags, uint16_t data = 0);
-        void dispatch(Command2 const &cmd);
+        void dispatch(Message::ID msgid, State::Flag flags, uint16_t data = 0);
+        void dispatch(Command const &cmd);
         void onPowerUp();
         
         SerialAudioCore         m_core;
-        Queue<Command2, 4>      m_queue;
-        State2                  m_state;
+        Queue<Command, 4>       m_queue;
+        State                   m_state;
         Message                 m_lastNotification;
         Timeout<MillisClock>    m_timeout;
 };

@@ -1,6 +1,6 @@
 #include <AidtopiaSerialAudio.h>
 
-using SerialAudio = aidtopia::SerialAudio2;
+using SerialAudio = aidtopia::SerialAudio;
 static SerialAudio audio;
 
 static constexpr int hexValue(char ch) {
