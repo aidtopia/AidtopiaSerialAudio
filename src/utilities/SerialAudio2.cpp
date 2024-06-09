@@ -329,7 +329,7 @@ void SerialAudio2::onEvent(Message const &msg, Hooks *hooks) {
     
     if (isQueryResponse(msg)) {
         if (m_state & EXPECT_RESPONSE) {
-            if (msg.getID() == static_cast<ID>((m_state & MSGID_MASK))) {
+            if (msg.getID() == lastSent()) {
                 Serial.println(F("Received expected query response"));
                 m_timeout.cancel();
                 m_state &= ~EXPECT_RESPONSE;
