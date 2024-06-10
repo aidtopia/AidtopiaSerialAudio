@@ -29,7 +29,7 @@ void SerialAudio::update(Hooks *hooks) {
             Message{Message::ID::ERROR, static_cast<uint16_t>(Error::TIMEDOUT)};
         onEvent(timeout, hooks);
     }
-    if (m_state.ready()) dispatch();
+    dispatch();
 }
 
 SerialAudio::Hooks::~Hooks() {}
@@ -90,36 +90,37 @@ void SerialAudio::queryVolume() {
     enqueue(Message::ID::VOLUME, State::EXPECT_RESPONSE);
 }
 
-void SerialAudio::setEqProfile(EqProfile /*eq*/) {
-//    enqueue(Message::ID::SETEQPROFILE, static_cast<uint16_t>(eq));
+void SerialAudio::setEqProfile(EqProfile eq) {
+    enqueue(Message::ID::SETEQPROFILE, State::EXPECT_ACK,
+            static_cast<uint16_t>(eq));
 }
 
 void SerialAudio::queryEqProfile() {
     enqueue(Message::ID::EQPROFILE, State::EXPECT_RESPONSE);
 }
 
-void SerialAudio::playFile(uint16_t /*index*/) {
-//    enqueue(Message::ID::PLAYFILE, index);
+void SerialAudio::playFile(uint16_t index) {
+    enqueue(Message::ID::PLAYFILE, State::EXPECT_ACK, index);
 }
 
 void SerialAudio::playNextFile() {
-//    enqueue(Message::ID::PLAYNEXT);
+    enqueue(Message::ID::PLAYNEXT, State::EXPECT_ACK);
 }
 
 void SerialAudio::playPreviousFile() {
-//    enqueue(Message::ID::PLAYPREVIOUS);
+    enqueue(Message::ID::PLAYPREVIOUS, State::EXPECT_ACK);
 }
 
-void SerialAudio::loopFile(uint16_t /*index*/) {
-//    enqueue(Message::ID::LOOPFILE, index);
+void SerialAudio::loopFile(uint16_t index) {
+    enqueue(Message::ID::LOOPFILE, State::EXPECT_ACK, index);
 }
 
 void SerialAudio::loopAllFiles() {
-//    enqueue(Message::ID::LOOPALL);
+    enqueue(Message::ID::LOOPALL, State::EXPECT_ACK);
 }
 
 void SerialAudio::playFilesInRandomOrder() {
-//    enqueue(Message::ID::RANDOMPLAY);
+    enqueue(Message::ID::RANDOMPLAY, State::EXPECT_ACK);
 }
 
 void SerialAudio::queryFolderCount() {
@@ -151,15 +152,15 @@ void SerialAudio::loopFolder(uint16_t folder) {
             folder);
 }
 
-void SerialAudio::queryCurrentFile(Device /*device*/) {
-//    auto msgid = Message::ID::NONE;
-//    switch (device) {
-//        case Device::USB:    msgid = Message::ID::CURRENTUSBFILE;   break;
-//        case Device::SDCARD: msgid = Message::ID::CURRENTSDFILE;    break;
-//        case Device::FLASH:  msgid = Message::ID::CURRENTFLASHFILE; break;
-//        default: return;
-//    }
-//    enqueue(msgid, Feedback::NO_FEEDBACK, State::RESPONSEPENDING, 100);
+void SerialAudio::queryCurrentFile(Device device) {
+    auto msgid = Message::ID::NONE;
+    switch (device) {
+        case Device::USB:    msgid = Message::ID::CURRENTUSBFILE;   break;
+        case Device::SDCARD: msgid = Message::ID::CURRENTSDFILE;    break;
+        case Device::FLASH:  msgid = Message::ID::CURRENTFLASHFILE; break;
+        default: return;
+    }
+    enqueue(msgid, State::EXPECT_RESPONSE);
 }
 
 void SerialAudio::queryPlaybackSequence() {
@@ -179,13 +180,14 @@ void SerialAudio::unpause() {
     enqueue(Message::ID::UNPAUSE, State::EXPECT_ACK);
 }
 
-void SerialAudio::insertAdvert(uint16_t /*track*/) {
-//    enqueue(Message::ID::INSERTADVERT, track);
+void SerialAudio::insertAdvert(uint16_t track) {
+    enqueue(Message::ID::INSERTADVERT, State::EXPECT_ACK, track);
 }
 
-void SerialAudio::insertAdvert(uint8_t /*folder*/, uint8_t /*track*/) {
-//    if (folder == 0) return insertAdvert(track);
-//    enqueue(Message::ID::INSERTADVERTN, combine(folder, track));
+void SerialAudio::insertAdvert(uint8_t folder, uint8_t track) {
+    if (folder == 0) return insertAdvert(track);
+    enqueue(Message::ID::INSERTADVERTN, State::EXPECT_ACK,
+            combine(folder, track));
 }
 
 void SerialAudio::stopAdvert() {
@@ -195,6 +197,7 @@ void SerialAudio::stopAdvert() {
 void SerialAudio::dispatch() {
     if (!m_state.ready()) return;
     if (m_queue.empty()) return;
+    Serial.println(F("Dispatching from queue"));
     dispatch(m_queue.peekFront());
     m_queue.popFront();
 }
@@ -216,8 +219,11 @@ void SerialAudio::dispatch(Command const &cmd) {
 }
 
 void SerialAudio::enqueue(Message::ID msgid, State::Flag flags, uint16_t data) {
-    m_queue.pushBack(Command{State{msgid, flags}, data});
-    if (m_state.ready()) dispatch();
+    if (m_queue.pushBack(Command{State{msgid, flags}, data})) {
+        dispatch();
+    } else {
+        Serial.println(F("Failed to enqueue command."));
+    }
 }
 
 void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {

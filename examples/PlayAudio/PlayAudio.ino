@@ -29,6 +29,7 @@ Button red_button;
 Button green_button;
 Button blue_button;
 Button yellow_button;
+unsigned long pingTimer;
 
 void setUpAudio() {
   // It's a good idea to explicitly select your input source.
@@ -63,6 +64,8 @@ void setup() {
 
   // You can issue audio commands now, and they'll queue up until the device
   // is ready.  Instead, we'll wait for the OnInitComplete callback.
+
+  pingTimer = millis();
 }
 
 class SpyHooks : public SerialAudio::Hooks {
@@ -132,7 +135,6 @@ class SpyHooks : public SerialAudio::Hooks {
       }
       Serial.println();
 
-      Serial.println(F("Issuing commands to set up the module."));
       setUpAudio();
     }
 
@@ -185,4 +187,10 @@ void loop() {
   if (green_button.update())    audio.loopFolder(1);
   if (blue_button.update())     audio.loopFolder(47);  // no such folder.
   if (yellow_button.update())   audio.reset();
+
+  auto const now = millis();
+  if (now - pingTimer > 3000) {
+    audio.queryStatus();
+    pingTimer = now;
+  }
 }

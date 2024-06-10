@@ -257,7 +257,7 @@ class SerialAudio {
         void onPowerUp();
         
         SerialAudioCore         m_core;
-        Queue<Command, 4>       m_queue;
+        Queue<Command, 6>       m_queue;
         State                   m_state;
         Message                 m_lastNotification;
         Timeout<MillisClock>    m_timeout;
