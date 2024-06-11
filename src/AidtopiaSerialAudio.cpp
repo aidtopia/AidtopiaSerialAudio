@@ -21,7 +21,7 @@ static bool isTimeout(Message const &msg) {
            msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::TIMEDOUT);
 }
 
-void SerialAudio::update(Hooks *hooks) {
+bool SerialAudio::update(Hooks *hooks) {
     Message msg;
     if (m_core.update(&msg)) onEvent(msg, hooks);
     if (m_timeout.expired()) {
@@ -30,6 +30,7 @@ void SerialAudio::update(Hooks *hooks) {
         onEvent(timeout, hooks);
     }
     dispatch();
+    return !m_queue.full();
 }
 
 SerialAudio::Hooks::~Hooks() {}
@@ -142,6 +143,14 @@ void SerialAudio::playTrack(uint16_t folder, uint16_t track) {
         auto const param = ((folder & 0x0F) << 12) | (track & 0x0FFF);
         enqueue(Message::ID::PLAYFROMBIGFOLDER, State::EXPECT_ACK, param);
     }
+}
+
+void SerialAudio::loopCurrentTrack() {
+    enqueue(Message::ID::LOOPCURRENTTRACK, State::EXPECT_ACK, 0);
+}
+
+void SerialAudio::stopLoopingCurrentTrack() {
+    enqueue(Message::ID::LOOPCURRENTTRACK, State::EXPECT_ACK, 1);
 }
 
 void SerialAudio::loopFolder(uint16_t folder) {

@@ -34,10 +34,7 @@ class SerialAudio {
             STOPPED     = 0x00,
             PLAYING     = 0x01,
             PAUSED      = 0x02,
-
             ALT_STOPPED = 0x03,  // Some modules supposedly use 3 instead of 0.
-                                 // Will be mapped back to STOPPED for Hooks.
-
             ASLEEP      = 0xFF   // Inferred from other INITCOMPLETE params
         };
         
@@ -103,12 +100,14 @@ class SerialAudio {
         // Client should call `update` frequently, typically each pass through
         // the `loop` function.
         //
+        // Returns true if ready for another command or query.
+        //
         // To receive a callback for a query response, an asynchronous
         // notification, or an error, provide a pointer to a class derived from
         // `SerialAudio::Hooks` that overrides the callback method(s) of
         // interest.
         class Hooks;
-        void update(Hooks *hooks = nullptr);
+        bool update(Hooks *hooks = nullptr);
 
         class Hooks {
             public:
@@ -170,6 +169,10 @@ class SerialAudio {
         void playTrack(uint16_t track);  // from "MP3" folder
         void playTrack(uint16_t folder, uint16_t track);
         void loopFolder(uint16_t folder);
+
+        // Control whether the currently playing track should loop.
+        void loopCurrentTrack();
+        void stopLoopingCurrentTrack();
 
         void queryCurrentFile(Device device);
         void queryPlaybackSequence();

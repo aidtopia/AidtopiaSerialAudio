@@ -35,7 +35,7 @@ class Message {
             STOP              = 0x16,
             LOOPFOLDER        = 0x17,
             RANDOMPLAY        = 0x18,
-            LOOPCURRENTFILE   = 0x19,
+            LOOPCURRENTTRACK  = 0x19,
             DISABLEDAC        = 0x1A,
             PLAYLIST          = 0x21,  // requires longer message length
             PLAYWITHVOLUME    = 0x22,  // seems redundant
