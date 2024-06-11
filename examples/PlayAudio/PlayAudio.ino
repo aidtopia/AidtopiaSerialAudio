@@ -22,55 +22,41 @@ class Button {
 
   private:
     uint8_t m_pin = 0;
-    enum class State { UP, DOWN } m_state = State::UP;
+    enum class State : uint8_t { UP, DOWN } m_state = State::UP;
 };
 
 Button red_button;
 Button green_button;
 Button blue_button;
 Button yellow_button;
-unsigned long pingTimer;
+
+static bool readyToSetUpAudio = false;
+static bool readyForSongChange = false;
 
 void setUpAudio() {
   // It's a good idea to explicitly select your input source.
   audio.selectSource(SerialAudio::Device::SDCARD);
 
-  // Queries will generate callbacks when the response is available.
-  audio.queryFirmwareVersion();
-  audio.queryEqProfile();
-
-  // Basic control.
+  // Set some parameters.
   audio.setVolume(20);
+  audio.setEqProfile(SerialAudio::EqProfile::BASS);
+
+  // Start making some noise!
   audio.playTrack(3);
+
+  readyToSetUpAudio = false;
 }
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println(F("\nAidtopia Serial Audio Test\n"));
-
-  Serial.print(F("sizeof(audio) = "));
-  Serial.println(sizeof(audio));
-
-  red_button.begin(4);
-  green_button.begin(5);
-  blue_button.begin(6);
-  yellow_button.begin(7);
-
-  // Initialize the audio module connected to Serial1.  If you don't have
-  // a hardware serial port available, you can use SoftwareSerial.  You do
-  // not have to call the serial device's begin method first.  This will
-  // set the baud rate.
-  audio.begin(Serial1);
-
-  // You can issue audio commands now, and they'll queue up until the device
-  // is ready.  Instead, we'll wait for the OnInitComplete callback.
-
-  pingTimer = millis();
+void changeSong() {
+  audio.decreaseVolume();
+  audio.playNextFile();
+  readyForSongChange = false;
 }
 
 class SpyHooks : public SerialAudio::Hooks {
   public:
     using EqProfile = SerialAudio::EqProfile;
+    using ModuleState = SerialAudio::ModuleState;
     using Error = SerialAudio::Error;
 
     void onError(Error error_code) override {
@@ -92,8 +78,7 @@ class SpyHooks : public SerialAudio::Hooks {
       Serial.print(F(" index "));
       Serial.print(index);
       Serial.println(F(" finished playing."));
-      audio.decreaseVolume();
-      audio.playNextFile();
+      readyForSongChange = true;
     }
 
     void onQueryResponse(Parameter param, uint16_t value) override {
@@ -114,8 +99,9 @@ class SpyHooks : public SerialAudio::Hooks {
         case Parameter::STATUS:
           Serial.print(F("Status: device="));
           printDeviceName(static_cast<Device>((value >> 8) & 0xFF));
-          Serial.print(F(" activity="));
-          Serial.println(value & 0xFF, HEX);
+          Serial.print(F(" state="));
+          printModuleStateName(static_cast<ModuleState>(value & 0xFF));
+          Serial.println();
           break;
         default:
           break;
@@ -135,7 +121,7 @@ class SpyHooks : public SerialAudio::Hooks {
       }
       Serial.println();
 
-      setUpAudio();
+      readyToSetUpAudio = true;
     }
 
   private:
@@ -162,6 +148,17 @@ class SpyHooks : public SerialAudio::Hooks {
       }
     }
 
+    void printModuleStateName(ModuleState state) {
+      switch (state) {
+        case ModuleState::STOPPED:      [[fallthrough]];
+        case ModuleState::ALT_STOPPED:  Serial.print("Stopped");  break;
+        case ModuleState::PLAYING:      Serial.print("Playing");  break;
+        case ModuleState::PAUSED:       Serial.print("Paused");   break;
+        case ModuleState::ASLEEP:       Serial.print("Asleep");   break;
+        default:                        Serial.print("unknown state"); break;
+      }
+    }
+
     void printErrorName(Error error) {
       switch (error) {
         case Error::UNSUPPORTED:    Serial.print(F("UNSUPPORTED"));   break;
@@ -180,17 +177,35 @@ class SpyHooks : public SerialAudio::Hooks {
     }
 } hooks;
 
+void setup() {
+  Serial.begin(115200);
+  Serial.println(F("\nAidtopia Serial Audio Test\n"));
+
+  Serial.print(F("sizeof(audio) = "));
+  Serial.println(sizeof(audio));
+
+  // Initialize the audio module connected to Serial1.  If you don't have
+  // a hardware serial port available, you can use SoftwareSerial.  You do
+  // not have to call the serial device's begin method first.  This will
+  // set the baud rate.
+  audio.begin(Serial1);
+
+  // You can issue audio commands now, and they'll queue up until the device
+  // is ready.  Instead, we'll wait for the OnInitComplete callback.
+
+  red_button.begin(4);
+  green_button.begin(5);
+  blue_button.begin(6);
+  yellow_button.begin(7);
+}
+
 void loop() {
   audio.update(&hooks);
+  if (readyToSetUpAudio) { setUpAudio(); }
+  if (readyForSongChange) { changeSong(); }
 
   if (red_button.update())      audio.stop();
   if (green_button.update())    audio.loopFolder(1);
   if (blue_button.update())     audio.loopFolder(47);  // no such folder.
   if (yellow_button.update())   audio.reset();
-
-  auto const now = millis();
-  if (now - pingTimer > 3000) {
-    audio.queryStatus();
-    pingTimer = now;
-  }
 }

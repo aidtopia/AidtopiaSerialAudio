@@ -218,12 +218,14 @@ void SerialAudio::dispatch(Command const &cmd) {
     m_timeout.set(duration);
 }
 
-void SerialAudio::enqueue(Message::ID msgid, State::Flag flags, uint16_t data) {
-    if (m_queue.pushBack(Command{State{msgid, flags}, data})) {
-        dispatch();
-    } else {
-        Serial.println(F("Failed to enqueue command."));
+bool SerialAudio::enqueue(Message::ID msgid, State::Flag flags, uint16_t data) {
+    auto const cmd = Command{State{msgid, flags}, data};
+    if (!m_queue.pushBack(cmd)) {
+        Serial.println(F("*** Failed to enqueue command"));
+        return false;
     }
+    dispatch();
+    return true;
 }
 
 void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
