@@ -119,8 +119,11 @@ class SerialAudio {
                 using Device = SerialAudio::Device;
                 using Devices = SerialAudio::Devices;
                 using DeviceChange = SerialAudio::DeviceChange;
-                using Parameter = SerialAudio::Parameter;
+                using EqProfile = SerialAudio::EqProfile;
                 using Error = SerialAudio::Error;
+                using ModuleState = SerialAudio::ModuleState;
+                using Parameter = SerialAudio::Parameter;
+                using Sequence = SerialAudio::Sequence;
 
                 virtual ~Hooks();
 
