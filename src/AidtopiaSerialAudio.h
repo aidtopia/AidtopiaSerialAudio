@@ -7,10 +7,10 @@
 #ifndef AIDTOPIASERIALAUDIO_H
 #define AIDTOPIASERIALAUDIO_H
 
-#include <utilities/core.h>
-#include <utilities/queue.h>
-#include <utilities/message.h>
-#include <utilities/timeout.h>
+#include "utilities/core.h"
+#include "utilities/queue.h"
+#include "utilities/message.h"
+#include "utilities/timeout.h"
 
 namespace aidtopia {
 

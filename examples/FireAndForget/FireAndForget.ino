@@ -8,7 +8,6 @@ void setup() {
   Serial.println(F("Hello, World!"));
   audio.begin(Serial1);
   audio.playTrack(3);
-  audio.loopCurrentTrack();
 }
 
 void loop() {

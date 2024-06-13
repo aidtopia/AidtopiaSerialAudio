@@ -1,8 +1,8 @@
 #ifndef AIDTOPIA_SERIALAUDIOCORE_H
 #define AIDTOPIA_SERIALAUDIOCORE_H
 
-#include <utilities/message.h>
-#include <utilities/messagebuffer.h>
+#include "utilities/message.h"
+#include "utilities/messagebuffer.h"
 
 namespace aidtopia {
 
