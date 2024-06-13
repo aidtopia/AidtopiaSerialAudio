@@ -21,6 +21,16 @@ static bool isTimeout(Message const &msg) {
            msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::TIMEDOUT);
 }
 
+SerialAudio::Devices::Devices(uint8_t bitmask) : m_bitmask(bitmask) {}
+
+bool SerialAudio::Devices::has(Device device) const {
+    auto const bit = static_cast<uint8_t>(device);
+    return (m_bitmask & bit) == bit;
+}
+
+bool SerialAudio::update()             { return update(nullptr); }
+bool SerialAudio::update(Hooks &hooks) { return update(&hooks);  }
+
 bool SerialAudio::update(Hooks *hooks) {
     Message msg;
     if (m_core.update(&msg)) onEvent(msg, hooks);
@@ -38,7 +48,7 @@ void SerialAudio::Hooks::onError(Error) {}
 void SerialAudio::Hooks::onQueryResponse(Parameter, uint16_t) {}
 void SerialAudio::Hooks::onDeviceChange(Device, DeviceChange) {}
 void SerialAudio::Hooks::onFinishedFile(Device, uint16_t) {}
-void SerialAudio::Hooks::onInitComplete(uint8_t) {}
+void SerialAudio::Hooks::onInitComplete(Devices) {}
 
 void SerialAudio::reset() {
     m_queue.clear();
@@ -319,21 +329,27 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
             Serial.println(F("Got INITCOMPLETE on power up"));
             m_state.clear(State::UNINITIALIZED);
             m_timeout.cancel();
-            if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
+            if (hooks != nullptr) {
+                hooks->onInitComplete(Devices(LSB(msg.getParam())));
+            }
             return;
         }
         if (m_state.sent() == ID::RESET) {
             Serial.println(F("Reset completed"));
             m_state.clear(State::UNINITIALIZED);
             m_timeout.cancel();
-            if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
+            if (hooks != nullptr) {
+                hooks->onInitComplete(Devices(LSB(msg.getParam())));
+            }
             return;
         }
         if (m_state.sent() == ID::INITCOMPLETE) {
             Serial.println(F("OMG! INITCOMPLETE worked as a query!"));
             m_state.clear(State::EXPECT_RESPONSE);
             m_timeout.cancel();
-            if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
+            if (hooks != nullptr) {
+                hooks->onInitComplete(Devices(LSB(msg.getParam())));
+            }
             return;
         }
         Serial.println(F("Audio module unexpectedly reset!"));
@@ -341,7 +357,9 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
         m_timeout.cancel();
         m_queue.clear();
         m_lastNotification.clear();
-        if (hooks != nullptr) hooks->onInitComplete(LSB(msg.getParam()));
+        if (hooks != nullptr) {
+            hooks->onInitComplete(Devices(LSB(msg.getParam())));
+        }
         return;
     }
     
@@ -358,7 +376,7 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
                     if (hooks != nullptr) {
                         // The device given in the status message is a reasonble
                         // proxy for the set of storage devices attached.
-                        auto const devices = MSB(msg.getParam());
+                        auto const devices = Devices(MSB(msg.getParam()));
                         hooks->onInitComplete(devices);
                         return;
                     }

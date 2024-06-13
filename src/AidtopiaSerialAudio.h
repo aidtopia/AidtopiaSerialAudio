@@ -30,6 +30,14 @@ class SerialAudio {
             SLEEP       = 0x10   // not selectable, but might be status results
         };
         
+        class Devices {
+            public:
+                explicit Devices(uint8_t bitmask = 0);
+                bool has(Device device) const;
+            private:
+                uint8_t m_bitmask;
+        };
+        
         enum class ModuleState : uint8_t {
             STOPPED     = 0x00,
             PLAYING     = 0x01,
@@ -101,17 +109,15 @@ class SerialAudio {
         // the `loop` function.
         //
         // Returns true if ready for another command or query.
-        //
+        bool update();
+        
         // To receive a callback for a query response, an asynchronous
-        // notification, or an error, provide a pointer to a class derived from
-        // `SerialAudio::Hooks` that overrides the callback method(s) of
-        // interest.
-        class Hooks;
-        bool update(Hooks *hooks = nullptr);
-
+        // notification, or an error, call update with an instance of a class
+        // derived from Hooks that overrides the callback method(s) of interest.
         class Hooks {
             public:
                 using Device = SerialAudio::Device;
+                using Devices = SerialAudio::Devices;
                 using DeviceChange = SerialAudio::DeviceChange;
                 using Parameter = SerialAudio::Parameter;
                 using Error = SerialAudio::Error;
@@ -124,8 +130,15 @@ class SerialAudio {
                 // Asynchronous Notifications
                 virtual void onDeviceChange(Device src, DeviceChange change);
                 virtual void onFinishedFile(Device device, uint16_t index);
-                virtual void onInitComplete(uint8_t devices);
+                virtual void onInitComplete(Devices devices);
         };
+
+        bool update(Hooks *hooks);
+
+        // (Arduino guidelines discourage libraries from requiring pointers in
+        // the public interface, so we'll let the client pass in hooks by
+        // reference.
+        bool update(Hooks &hooks);
 
         // These are the commands and queries the client can use to control the
         // audio module.
