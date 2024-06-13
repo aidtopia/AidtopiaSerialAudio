@@ -268,4 +268,7 @@ class SerialAudio {
 
 }
 
+// Make the class available in the global namespace.
+using AidtopiaSerialAudio = aidtopia::SerialAudio;
+
 #endif
