@@ -17,7 +17,7 @@ namespace aidtopia {
 class SerialAudio {
     public:
         // From the client's point of view, these enumerations are just
-        // arbitrary constants, but do not change any explicitly listed values.
+        // arbitrary constants.  Do not change any explicitly listed values.
         // They correspond to ones used in the message protocol for the
         // convenience of the implementation.
 
@@ -30,6 +30,7 @@ class SerialAudio {
             SLEEP       = 0x10   // not selectable, but might be status results
         };
         
+        // Represents a set of Device.
         class Devices {
             public:
                 Devices();
@@ -301,6 +302,7 @@ class SerialAudio {
         bool enqueue(Message::ID msgid, State::Flag flags, uint16_t data = 0);
         void onEvent(Message const &msg, Hooks *hooks);
         void handleEvent(Message const &msg, Hooks *hooks);
+        bool discoveryContinues();
         void dispatch();
         void dispatch(Message::ID msgid, State::Flag flags, uint16_t data = 0);
         void dispatch(Command const &cmd);
@@ -310,6 +312,9 @@ class SerialAudio {
         Queue<Command, 4>       m_queue;
         State                   m_state;
         Timeout<MillisClock>    m_timeout;
+        // These are used by the state machine discover available devices.
+        Devices                 m_available;
+        Devices                 m_tocheck;
 };
 
 SerialAudio::Devices operator|(SerialAudio::Device d1, SerialAudio::Device d2);

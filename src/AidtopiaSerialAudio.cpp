@@ -345,7 +345,6 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
     if (m_state.has(State::DELAY))            Serial.print(F(" | DELAY"));
     if (m_state.has(State::UNINITIALIZED))    Serial.print(F(" | UNINITIALIZED"));
     Serial.println();
-    
     handleEvent(msg, hooks);
     
     // We might be ready to dispatch a queued command now.
@@ -363,11 +362,14 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
             switch (msg.getID()) {
                 case ID::DEVICEINSERTED: {
                     auto const device = static_cast<Device>(msg.getParam());
+                    m_tocheck.insert(device);
                     hooks->handleDeviceChange(device, DeviceChange::INSERTED);
                     break;
                 }
                 case ID::DEVICEREMOVED: {
                     auto const device = static_cast<Device>(msg.getParam());
+                    m_available.remove(device);
+                    m_tocheck.remove(device);
                     hooks->handleDeviceChange(device, DeviceChange::REMOVED);
                     break;
                 }
@@ -447,16 +449,58 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
                 Serial.println(F("Received expected query response"));
                 m_timeout.cancel();
                 m_state.clear(State::EXPECT_RESPONSE);
-                if (msg.getID() == ID::STATUS && m_state.has(State::UNINITIALIZED)) {
-                    // A valid response to a status query while we're uninitialized
-                    // means we've detected a live audio module after powerup.
-                    m_state.clear(State::UNINITIALIZED);
-                    if (hooks != nullptr) {
-                        // The device given in the status message is a reasonable
-                        // proxy for the set of storage devices attached.
-                        auto const devices = Devices(MSB(msg.getParam()));
-                        hooks->handleInitComplete(devices);
-                        return;
+                if (m_state.has(State::UNINITIALIZED)) {
+                    switch (msg.getID()) {
+                        case ID::STATUS: {
+                            // A response to a status query while we're
+                            // uninitialized means we've detected a live audio
+                            // module after powerup.
+                            if (hooks != nullptr) {
+                                // The device given in the status message is
+                                // currently selected.  We'll assume that means
+                                // it's available, and we'll try to discover any
+                                // other available devices before reporting that
+                                // the device is initialized.
+                                Device const device = Device(MSB(msg.getParam()));
+                                m_tocheck = Device::USB | Device::SDCARD | Device::FLASH;
+                                m_tocheck.remove(device);
+                                m_available = Devices(device);
+                                if (discoveryContinues()) return;
+                                hooks->handleInitComplete(m_available);
+                            }
+                            return;
+                        }
+
+                        // A file count while we're uninitialized means we are
+                        // trying to discover which devices are available.
+
+                        case ID::USBFILECOUNT: {
+                            if (msg.getParam() > 0) m_available |= Device::USB;
+                            if (discoveryContinues()) return;
+                            if (hooks != nullptr) {
+                                hooks->handleInitComplete(m_available);
+                            }
+                            return;
+                        }
+                        case ID::SDFILECOUNT: {
+                            if (msg.getParam() > 0) m_available |= Device::SDCARD;
+                            if (discoveryContinues()) return;
+                            if (hooks != nullptr) {
+                                hooks->handleInitComplete(m_available);
+                            }
+                            return;
+                        }
+                        case ID::FLASHFILECOUNT: {
+                            if (msg.getParam() > 0) m_available |= Device::FLASH;
+                            if (discoveryContinues()) return;
+                            if (hooks != nullptr) {
+                                hooks->handleInitComplete(m_available);
+                            }
+                            return;
+                        }
+
+                        default:  // Uh, TBD?
+                            return;
                     }
                 }
                 if (hooks != nullptr) {
@@ -495,6 +539,32 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
         }
         return;
     }
+}
+
+bool SerialAudio::discoveryContinues() {
+    auto const discoveryState =
+        State::EXPECT_RESPONSE | State::UNINITIALIZED;
+    if (m_tocheck.has(Device::USB)) {
+        Serial.println(F("Discovery tries USB."));
+        m_tocheck.remove(Device::USB);
+        dispatch(Message::ID::USBFILECOUNT, discoveryState);
+        return true;
+    }
+    if (m_tocheck.has(Device::SDCARD)) {
+        Serial.println(F("Discovery tries SD card."));
+        m_tocheck.remove(Device::SDCARD);
+        dispatch(Message::ID::SDFILECOUNT, discoveryState);
+        return true;
+    }
+    if (m_tocheck.has(Device::FLASH)) {
+        Serial.println(F("Discovery tries flash memory."));
+        m_tocheck.remove(Device::FLASH);
+        dispatch(Message::ID::FLASHFILECOUNT, discoveryState);
+        return true;
+    }
+    m_state.clear(State::UNINITIALIZED);
+    Serial.println(F("Discovery finished."));
+    return false;
 }
 
 void SerialAudio::onPowerUp() {
