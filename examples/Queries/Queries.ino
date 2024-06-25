@@ -110,7 +110,7 @@ class QueryResponseHooks : public AidtopiaSerialAudio::Hooks {
         }
 
         default:
-          Serial.print(F("Recevied a query response for a parameter this "));
+          Serial.print(F("Received a query response for a parameter this "));
           Serial.println(F("example doesn't track."));
           break;
       }

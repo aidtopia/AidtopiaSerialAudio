@@ -78,7 +78,7 @@ PlaylistHooks myHooks;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println(F("Playlist example for AidtopiaSerialAudio."));
+  Serial.println(F("Playlist example for AidtopiaSerialAudio"));
 
   audio.begin(Serial1);
 
