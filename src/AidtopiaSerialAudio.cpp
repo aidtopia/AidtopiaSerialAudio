@@ -21,12 +21,61 @@ static bool isTimeout(Message const &msg) {
            msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::TIMEDOUT);
 }
 
+SerialAudio::Devices::Devices() : m_bitmask(0) {}
+
+SerialAudio::Devices::Devices(SerialAudio::Device device) :
+    m_bitmask(static_cast<uint8_t>(device)) {}
+
 SerialAudio::Devices::Devices(uint8_t bitmask) : m_bitmask(bitmask) {}
+
+SerialAudio::Devices &SerialAudio::Devices::operator|=(SerialAudio::Devices const &rhs) {
+    m_bitmask |= rhs.m_bitmask;
+    return *this;
+}
+
+bool SerialAudio::Devices::empty() const {
+    return m_bitmask == 0;
+}
 
 bool SerialAudio::Devices::has(Device device) const {
     auto const bit = static_cast<uint8_t>(device);
     return (m_bitmask & bit) == bit;
 }
+
+bool SerialAudio::Devices::hasAny(Devices devices) const {
+    return (m_bitmask & devices.m_bitmask) != 0;
+}
+
+void SerialAudio::Devices::clear() {
+    m_bitmask = 0;
+}
+
+void SerialAudio::Devices::insert(Device device) {
+    auto const bit = static_cast<uint8_t>(device);
+    m_bitmask |= bit;
+}
+
+void SerialAudio::Devices::remove(Device device) {
+    auto const bit = static_cast<uint8_t>(device);
+    m_bitmask &= ~bit;
+}
+
+SerialAudio::Devices operator|(SerialAudio::Device d1, SerialAudio::Device d2) {
+    return SerialAudio::Devices{d1} |= SerialAudio::Devices{d2};
+}
+
+SerialAudio::Devices operator|(SerialAudio::Device d1, SerialAudio::Devices d2) {
+    return SerialAudio::Devices{d1} |= d2;
+}
+
+SerialAudio::Devices operator|(SerialAudio::Devices d1, SerialAudio::Device d2) {
+    return d1 |= SerialAudio::Devices{d2};
+}
+
+SerialAudio::Devices operator|(SerialAudio::Devices d1, SerialAudio::Devices d2) {
+    return d1 |= d2;
+}
+
 
 bool SerialAudio::update()             { return update(nullptr); }
 bool SerialAudio::update(Hooks &hooks) { return update(&hooks);  }
@@ -44,6 +93,39 @@ bool SerialAudio::update(Hooks *hooks) {
 }
 
 SerialAudio::Hooks::~Hooks() {}
+
+// The non-virtual interface is just a wrapper for the overridable hook methods.
+void SerialAudio::Hooks::handleError(Error error) {
+    onError(error);
+}
+
+void SerialAudio::Hooks::handleQueryResponse(Parameter param, uint16_t value) {
+    onQueryResponse(param, value);
+}
+
+void SerialAudio::Hooks::handleDeviceChange(Device device, DeviceChange change) {
+    onDeviceChange(device, change);
+}
+
+void SerialAudio::Hooks::handleFinishedFile(Device device, uint16_t index) {
+    if (device == m_deviceLastFinished && index == m_indexLastFinished) {
+        Serial.println(F("Duplicate notification suppressed."));
+        m_deviceLastFinished = Device::NONE;
+        m_indexLastFinished = 0;
+        return;
+    }
+    onFinishedFile(device, index);
+    m_deviceLastFinished = device;
+    m_indexLastFinished = index;
+}
+
+void SerialAudio::Hooks::handleInitComplete(Devices devices) {
+    onInitComplete(devices);
+    m_deviceLastFinished = Device::NONE;
+    m_indexLastFinished = 0;
+}
+
+// Unless a subclass provides overrides, the hooks do nothing.
 void SerialAudio::Hooks::onError(Error) {}
 void SerialAudio::Hooks::onQueryResponse(Parameter, uint16_t) {}
 void SerialAudio::Hooks::onDeviceChange(Device, DeviceChange) {}
@@ -52,7 +134,6 @@ void SerialAudio::Hooks::onInitComplete(Devices) {}
 
 void SerialAudio::reset() {
     m_queue.clear();
-    m_lastNotification.clear();
     dispatch(Message::ID::RESET, State::EXPECT_ACK | State::UNINITIALIZED);
     m_timeout.set(3000);
 }
@@ -134,8 +215,31 @@ void SerialAudio::playFilesInRandomOrder() {
     enqueue(Message::ID::RANDOMPLAY, State::EXPECT_ACK);
 }
 
+void SerialAudio::queryCurrentFile(Device device) {
+    auto msgid = Message::ID::NONE;
+    switch (device) {
+        case Device::USB:    msgid = Message::ID::CURRENTUSBFILE;   break;
+        case Device::SDCARD: msgid = Message::ID::CURRENTSDFILE;    break;
+        case Device::FLASH:  msgid = Message::ID::CURRENTFLASHFILE; break;
+        default: return;
+    }
+    enqueue(msgid, State::EXPECT_RESPONSE);
+}
+
 void SerialAudio::queryFolderCount() {
     enqueue(Message::ID::FOLDERCOUNT, State::EXPECT_RESPONSE);
+}
+
+void SerialAudio::queryFolderFileCount(uint16_t folder) {
+    enqueue(Message::ID::FOLDERFILECOUNT, State::EXPECT_RESPONSE, folder);
+}
+
+void SerialAudio::loopFolder(uint16_t folder) {
+    // Note that this command ACKs twice when successful.  I think one is for
+    // the command to put it into loop folder mode and the second is when it
+    // actually begins playing.
+    enqueue(Message::ID::LOOPFOLDER, State::EXPECT_ACK | State::EXPECT_ACK2,
+            folder);
 }
 
 void SerialAudio::playTrack(uint16_t track) {
@@ -161,25 +265,6 @@ void SerialAudio::loopCurrentTrack() {
 
 void SerialAudio::stopLoopingCurrentTrack() {
     enqueue(Message::ID::LOOPCURRENTTRACK, State::EXPECT_ACK, 1);
-}
-
-void SerialAudio::loopFolder(uint16_t folder) {
-    // Note that this command ACKs twice when successful.  I think one is for
-    // the command to put it into loop folder mode and the second is when it
-    // actually begins playing.
-    enqueue(Message::ID::LOOPFOLDER, State::EXPECT_ACK | State::EXPECT_ACK2,
-            folder);
-}
-
-void SerialAudio::queryCurrentFile(Device device) {
-    auto msgid = Message::ID::NONE;
-    switch (device) {
-        case Device::USB:    msgid = Message::ID::CURRENTUSBFILE;   break;
-        case Device::SDCARD: msgid = Message::ID::CURRENTSDFILE;    break;
-        case Device::FLASH:  msgid = Message::ID::CURRENTFLASHFILE; break;
-        default: return;
-    }
-    enqueue(msgid, State::EXPECT_RESPONSE);
 }
 
 void SerialAudio::queryPlaybackSequence() {
@@ -228,7 +313,7 @@ void SerialAudio::dispatch(Message::ID msgid, State::Flag flags, uint16_t data) 
 void SerialAudio::dispatch(Command const &cmd) {
     auto const feedback =
         cmd.state.has(State::EXPECT_ACK) ? Feedback::FEEDBACK :
-                                            Feedback::NO_FEEDBACK;
+                                           Feedback::NO_FEEDBACK;
     m_core.send(Message{cmd.state.sent(), cmd.param}, feedback);
     m_state = cmd.state;
     unsigned const duration =
@@ -275,31 +360,25 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
         // we're in an uninitialized or a no-sources state.
 
         if (hooks != nullptr) {
-            if (msg == m_lastNotification) {
-                // Some notifications arrive twice in a row, but we don't want
-                // to confuse the client by calling back twice.
-                m_lastNotification.clear();
-                Serial.println(F("Duplicate notification suppressed."));
-                return;
-            }
-            m_lastNotification = msg;
             switch (msg.getID()) {
-                case ID::DEVICEINSERTED:
-                    hooks->onDeviceChange(static_cast<Device>(msg.getParam()),
-                                          DeviceChange::INSERTED);
+                case ID::DEVICEINSERTED: {
+                    auto const device = static_cast<Device>(msg.getParam());
+                    hooks->handleDeviceChange(device, DeviceChange::INSERTED);
                     break;
-                case ID::DEVICEREMOVED:
-                    hooks->onDeviceChange(static_cast<Device>(msg.getParam()),
-                                          DeviceChange::REMOVED);
+                }
+                case ID::DEVICEREMOVED: {
+                    auto const device = static_cast<Device>(msg.getParam());
+                    hooks->handleDeviceChange(device, DeviceChange::REMOVED);
                     break;
+                }
                 case ID::FINISHEDUSBFILE:
-                    hooks->onFinishedFile(Device::USB, msg.getParam());
+                    hooks->handleFinishedFile(Device::USB, msg.getParam());
                     break;
                 case ID::FINISHEDSDFILE:
-                    hooks->onFinishedFile(Device::SDCARD, msg.getParam());
+                    hooks->handleFinishedFile(Device::SDCARD, msg.getParam());
                     break;
                 case ID::FINISHEDFLASHFILE:
-                    hooks->onFinishedFile(Device::FLASH, msg.getParam());
+                    hooks->handleFinishedFile(Device::FLASH, msg.getParam());
                     break;
                 default:
                     break;
@@ -330,7 +409,7 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
             m_state.clear(State::UNINITIALIZED);
             m_timeout.cancel();
             if (hooks != nullptr) {
-                hooks->onInitComplete(Devices(LSB(msg.getParam())));
+                hooks->handleInitComplete(Devices(LSB(msg.getParam())));
             }
             return;
         }
@@ -339,7 +418,7 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
             m_state.clear(State::UNINITIALIZED);
             m_timeout.cancel();
             if (hooks != nullptr) {
-                hooks->onInitComplete(Devices(LSB(msg.getParam())));
+                hooks->handleInitComplete(Devices(LSB(msg.getParam())));
             }
             return;
         }
@@ -348,7 +427,7 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
             m_state.clear(State::EXPECT_RESPONSE);
             m_timeout.cancel();
             if (hooks != nullptr) {
-                hooks->onInitComplete(Devices(LSB(msg.getParam())));
+                hooks->handleInitComplete(Devices(LSB(msg.getParam())));
             }
             return;
         }
@@ -356,9 +435,8 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
         m_state = State{Message:ID::NONE};
         m_timeout.cancel();
         m_queue.clear();
-        m_lastNotification.clear();
         if (hooks != nullptr) {
-            hooks->onInitComplete(Devices(LSB(msg.getParam())));
+            hooks->handleInitComplete(Devices(LSB(msg.getParam())));
         }
         return;
     }
@@ -370,20 +448,20 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
                 m_timeout.cancel();
                 m_state.clear(State::EXPECT_RESPONSE);
                 if (msg.getID() == ID::STATUS && m_state.has(State::UNINITIALIZED)) {
-                    // A valid response to a status query means we've detected a
-                    // live audio module after powerup.
+                    // A valid response to a status query while we're uninitialized
+                    // means we've detected a live audio module after powerup.
                     m_state.clear(State::UNINITIALIZED);
                     if (hooks != nullptr) {
-                        // The device given in the status message is a reasonble
+                        // The device given in the status message is a reasonable
                         // proxy for the set of storage devices attached.
                         auto const devices = Devices(MSB(msg.getParam()));
-                        hooks->onInitComplete(devices);
+                        hooks->handleInitComplete(devices);
                         return;
                     }
                 }
                 if (hooks != nullptr) {
-                    hooks->onQueryResponse(static_cast<Parameter>(msg.getID()),
-                                           msg.getParam());
+                    auto const param = static_cast<Parameter>(msg.getID());
+                    hooks->handleQueryResponse(param, msg.getParam());
                 }
                 return;
             }
@@ -413,7 +491,7 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
         m_timeout.cancel();
         m_state.clear(State::ALL_FLAGS);
         if (hooks != nullptr) {
-            hooks->onError(static_cast<SerialAudio::Error>(msg.getParam()));
+            hooks->handleError(static_cast<SerialAudio::Error>(msg.getParam()));
         }
         return;
     }
@@ -425,9 +503,8 @@ void SerialAudio::onPowerUp() {
     // a reset while already resetting.  So we'll assume the device is powering
     // up and wait for an initialization complete (0x3F) notification.  If one
     // doesn't come, the state machine will fall back to figuring out whether
-    // the module is already online and to discover what devices are attached.
+    // the module is already online and which devices are attached.
     m_queue.clear();
-    m_lastNotification.clear();
     m_state = State();
     m_timeout.set(3000);
     Serial.println(F("onPowerUp: Waiting for INITCOMPLETE."));

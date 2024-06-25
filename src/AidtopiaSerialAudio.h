@@ -32,8 +32,18 @@ class SerialAudio {
         
         class Devices {
             public:
-                explicit Devices(uint8_t bitmask = 0);
+                Devices();
+                Devices(Device device);  // implicit conversion
+                explicit Devices(uint8_t bitmask);
+                Devices(Devices const &rhs) = default;
+                Devices &operator=(Devices const &rhs) = default;
+                Devices &operator|=(Devices const &rhs);
+                bool empty() const;
                 bool has(Device device) const;
+                bool hasAny(Devices devices) const;
+                void clear();
+                void insert(Device device);
+                void remove(Device device);
             private:
                 uint8_t m_bitmask;
         };
@@ -68,30 +78,32 @@ class SerialAudio {
         // These are the module parameters that can be queried.
         enum class Parameter {
             CURRENTFILE,        // I'm not sure how to implement this right now
-            DEVICEFILECOUNT,    // I'm not sure how to implement this right now
+            USBFILECOUNT        = static_cast<uint8_t>(Message::ID::USBFILECOUNT),
+            SDFILECOUNT         = static_cast<uint8_t>(Message::ID::SDFILECOUNT),
+            FLASHFILECOUNT      = static_cast<uint8_t>(Message::ID::FLASHFILECOUNT),
             EQPROFILE           = static_cast<uint8_t>(Message::ID::EQPROFILE),
             FIRMWAREVERSION     = static_cast<uint8_t>(Message::ID::FIRMWAREVERSION),
-            FOLDERCOUNT,        // I'm not sure how to implement this right now
-            FOLDERTRACKCOUNT,   // I'm not sure how to implement this right now
+            FOLDERCOUNT         = static_cast<uint8_t>(Message::ID::FOLDERCOUNT),
+            FOLDERFILECOUNT,   // I'm not sure how to implement this right now
             PLAYBACKSEQUENCE    = static_cast<uint8_t>(Message::ID::PLAYBACKSEQUENCE),
             STATUS              = static_cast<uint8_t>(Message::ID::STATUS),
             VOLUME              = static_cast<uint8_t>(Message::ID::VOLUME)
         };
 
         enum class Error : uint16_t {
-          UNSUPPORTED        = 0x00,  // MsgID used is not supported
-          NOSOURCES          = 0x01,  // module busy or no sources installed
-          SLEEPING           = 0x02,  // module is sleeping
-          SERIALERROR        = 0x03,  // serial communication error
-          BADCHECKSUM        = 0x04,  // module received bad checksum
-          FILEOUTOFRANGE     = 0x05,  // this is the file index
-          TRACKNOTFOUND      = 0x06,  // couldn't find track by numeric prefix
-          INSERTIONERROR     = 0x07,  // couldn't start ADVERT track
-          SDCARDERROR        = 0x08,  // unformatted card??
-          ENTEREDSLEEP       = 0x0A,  // entered sleep mode??
+            UNSUPPORTED        = 0x00,  // MsgID used is not supported
+            NOSOURCES          = 0x01,  // module busy or no sources installed
+            SLEEPING           = 0x02,  // module is sleeping
+            SERIALERROR        = 0x03,  // serial communication error
+            BADCHECKSUM        = 0x04,  // module received bad checksum
+            FILEOUTOFRANGE     = 0x05,  // this is the file index
+            TRACKNOTFOUND      = 0x06,  // couldn't find track by numeric prefix
+            INSERTIONERROR     = 0x07,  // couldn't start ADVERT track
+            SDCARDERROR        = 0x08,  // unformatted card??
+            ENTEREDSLEEP       = 0x0A,  // entered sleep mode??
 
-          // And reserving one for our state machine
-          TIMEDOUT           = 0x0100
+            // And reserving one for our state machine
+            TIMEDOUT           = 0x0100
         };
 
         // Client must call `begin` before anything else, typically in `setup`.
@@ -112,7 +124,7 @@ class SerialAudio {
         bool update();
         
         // To receive a callback for a query response, an asynchronous
-        // notification, or an error, call update with an instance of a class
+        // notification, or an error, call `update` with an instance of a class
         // derived from Hooks that overrides the callback method(s) of interest.
         class Hooks {
             public:
@@ -127,6 +139,16 @@ class SerialAudio {
 
                 virtual ~Hooks();
 
+                // NVI:  Non-virtual interface forwards events to the private
+                // virtual methods.
+                void handleError(Error code);
+                void handleQueryResponse(Parameter param, uint16_t value);
+                void handleDeviceChange(Device src, DeviceChange change);
+                void handleFinishedFile(Device device, uint16_t index);
+                void handleInitComplete(Devices devices);
+
+            private:
+                // Provide overrides for any or all of these methods.
                 virtual void onError(Error code);
                 virtual void onQueryResponse(Parameter param, uint16_t value);
 
@@ -134,6 +156,11 @@ class SerialAudio {
                 virtual void onDeviceChange(Device src, DeviceChange change);
                 virtual void onFinishedFile(Device device, uint16_t index);
                 virtual void onInitComplete(Devices devices);
+
+            private:
+                // For filtering duplicate asynchronous notifications.
+                Device m_deviceLastFinished;
+                uint16_t m_indexLastFinished;
         };
 
         bool update(Hooks *hooks);
@@ -179,18 +206,22 @@ class SerialAudio {
         void loopFile(uint16_t index);
         void loopAllFiles();
         void playFilesInRandomOrder();
+        void queryCurrentFile(Device device);
+
+        // Methods that use folder numbers refer to the folder name's numeric
+        // prefix.
+        void queryFolderCount();
+        void queryFolderFileCount(uint16_t folder);
+        void loopFolder(uint16_t folder);
 
         // Methods with "Track" refer to sounds files by the file name's prefix.
-        void queryFolderCount();
         void playTrack(uint16_t track);  // from "MP3" folder
         void playTrack(uint16_t folder, uint16_t track);
-        void loopFolder(uint16_t folder);
 
         // Control whether the currently playing track should loop.
         void loopCurrentTrack();
         void stopLoopingCurrentTrack();
 
-        void queryCurrentFile(Device device);
         void queryPlaybackSequence();
 
         void stop();
@@ -274,13 +305,17 @@ class SerialAudio {
         void dispatch(Message::ID msgid, State::Flag flags, uint16_t data = 0);
         void dispatch(Command const &cmd);
         void onPowerUp();
-        
+
         SerialAudioCore         m_core;
         Queue<Command, 4>       m_queue;
         State                   m_state;
-        Message                 m_lastNotification;
         Timeout<MillisClock>    m_timeout;
 };
+
+SerialAudio::Devices operator|(SerialAudio::Device d1, SerialAudio::Device d2);
+SerialAudio::Devices operator|(SerialAudio::Device d1, SerialAudio::Devices d2);
+SerialAudio::Devices operator|(SerialAudio::Devices d1, SerialAudio::Device d2);
+SerialAudio::Devices operator|(SerialAudio::Devices d1, SerialAudio::Devices d2);
 
 }
 

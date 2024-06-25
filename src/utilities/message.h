@@ -74,7 +74,7 @@ class Message {
             CURRENTUSBFILE    = 0x4B,
             CURRENTSDFILE     = 0x4C,
             CURRENTFLASHFILE  = 0x4D,
-            FOLDERTRACKCOUNT  = 0x4E,
+            FOLDERFILECOUNT   = 0x4E,
             FOLDERCOUNT       = 0x4F,
             CURRENTFLASHFOLDER= 0x61
         };
