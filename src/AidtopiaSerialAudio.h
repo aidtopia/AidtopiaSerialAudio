@@ -134,6 +134,7 @@ class SerialAudio {
                 using DeviceChange = SerialAudio::DeviceChange;
                 using EqProfile = SerialAudio::EqProfile;
                 using Error = SerialAudio::Error;
+                using ID = aidtopia::Message::ID;
                 using ModuleState = SerialAudio::ModuleState;
                 using Parameter = SerialAudio::Parameter;
                 using Sequence = SerialAudio::Sequence;
@@ -142,7 +143,7 @@ class SerialAudio {
 
                 // NVI:  Non-virtual interface forwards events to the private
                 // virtual methods.
-                void handleError(Error code);
+                void handleError(Error code, ID msgid);
                 void handleQueryResponse(Parameter param, uint16_t value);
                 void handleDeviceChange(Device src, DeviceChange change);
                 void handleFinishedFile(Device device, uint16_t index);
@@ -150,7 +151,7 @@ class SerialAudio {
 
             private:
                 // Provide overrides for any or all of these methods.
-                virtual void onError(Error code);
+                virtual void onError(Error code, Message::ID msgid);
                 virtual void onQueryResponse(Parameter param, uint16_t value);
 
                 // Asynchronous Notifications

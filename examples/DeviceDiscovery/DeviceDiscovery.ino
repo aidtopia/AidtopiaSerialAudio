@@ -34,13 +34,17 @@ class DeviceDiscoveryHooks : public AidtopiaSerialAudio::Hooks {
       explore();
     }
 
-    void onError(Error code) override {
+    void onError(Error code, ID msgid) override {
       if (code == Error::TRACKNOTFOUND &&
+          msgid == ID::FOLDERFILECOUNT &&
           m_device != Device::NONE &&
           m_folder < m_folderCount
       ) {
         onQueryResponse(Parameter::FOLDERFILECOUNT, 0);
+        return;
       }
+      Serial.print(F("Error occurred: "));
+      Serial.println(static_cast<uint16_t>(code), HEX);
     }
 
     void onDeviceChange(Device device, DeviceChange change) override {

@@ -100,8 +100,8 @@ bool SerialAudio::update(Hooks *hooks) {
 SerialAudio::Hooks::~Hooks() {}
 
 // The non-virtual interface is just a wrapper for the overridable hook methods.
-void SerialAudio::Hooks::handleError(Error error) {
-    onError(error);
+void SerialAudio::Hooks::handleError(Error error, Message::ID msgid) {
+    onError(error, msgid);
 }
 
 void SerialAudio::Hooks::handleQueryResponse(Parameter param, uint16_t value) {
@@ -131,7 +131,7 @@ void SerialAudio::Hooks::handleInitComplete(Devices devices) {
 }
 
 // Unless a subclass provides overrides, the hooks do nothing.
-void SerialAudio::Hooks::onError(Error) {}
+void SerialAudio::Hooks::onError(Error, ID) {}
 void SerialAudio::Hooks::onQueryResponse(Parameter, uint16_t) {}
 void SerialAudio::Hooks::onDeviceChange(Device, DeviceChange) {}
 void SerialAudio::Hooks::onFinishedFile(Device, uint16_t) {}
@@ -552,7 +552,8 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
         m_timeout.cancel();
         m_state.clear(State::ALL_FLAGS);
         if (hooks != nullptr) {
-            hooks->handleError(static_cast<SerialAudio::Error>(msg.getParam()));
+            auto const code = static_cast<SerialAudio::Error>(msg.getParam());
+            hooks->handleError(code, m_state.sent());
         }
         return;
     }
