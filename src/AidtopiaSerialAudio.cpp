@@ -21,6 +21,11 @@ static bool isTimeout(Message const &msg) {
            msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::TIMEDOUT);
 }
 
+static bool isNoSources(Message const &msg) {
+    return isError(msg) &&
+           msg.getParam() == static_cast<uint16_t>(SerialAudio::Error::NOSOURCES);
+}
+
 SerialAudio::Devices::Devices() : m_bitmask(0) {}
 
 SerialAudio::Devices::Devices(SerialAudio::Device device) :
@@ -529,6 +534,18 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
             return;
         }
         // Fall through to the general error handler.
+    }
+    
+    if (isNoSources(msg) && m_state.has(State::UNINITIALIZED)) {
+        // The module explicitly told us there are no sources while we were
+        // initializing, so we can skip device discovery.
+        m_timeout.cancel();
+        m_state.clear(State::ALL_FLAGS);
+        m_available.clear();
+        m_tocheck.clear();
+        if (hooks != nullptr) {
+            hooks->handleInitComplete(m_available);
+        }
     }
     
     if (isError(msg)) {

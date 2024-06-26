@@ -85,7 +85,7 @@ class SerialAudio {
             EQPROFILE           = static_cast<uint8_t>(Message::ID::EQPROFILE),
             FIRMWAREVERSION     = static_cast<uint8_t>(Message::ID::FIRMWAREVERSION),
             FOLDERCOUNT         = static_cast<uint8_t>(Message::ID::FOLDERCOUNT),
-            FOLDERFILECOUNT,   // I'm not sure how to implement this right now
+            FOLDERFILECOUNT     = static_cast<uint8_t>(Message::ID::FOLDERFILECOUNT),
             PLAYBACKSEQUENCE    = static_cast<uint8_t>(Message::ID::PLAYBACKSEQUENCE),
             STATUS              = static_cast<uint8_t>(Message::ID::STATUS),
             VOLUME              = static_cast<uint8_t>(Message::ID::VOLUME)
