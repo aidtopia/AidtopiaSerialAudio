@@ -22,8 +22,11 @@ class DeviceDiscoveryHooks : public AidtopiaSerialAudio::Hooks {
   public:
     DeviceDiscoveryHooks() :
       m_toexplore(),
+      m_device(Device::NONE),
+      m_fileCount(0),
       m_folderCount(0),
-      m_folder(0) {}
+      m_folder(0),
+      m_fileTally(0) {}
 
     void onInitComplete(Devices devices) override {
       Serial.print(F("Devices Available:"));
@@ -74,26 +77,64 @@ class DeviceDiscoveryHooks : public AidtopiaSerialAudio::Hooks {
 
     void onQueryResponse(Parameter param, uint16_t value) override {
       switch (param) {
+        case Parameter::USBFILECOUNT:   [[fallthrough]];
+        case Parameter::SDFILECOUNT:    [[fallthrough]];
+        case Parameter::FLASHFILECOUNT:
+          m_fileCount = value;
+          m_fileTally = 0;
+          if (m_fileCount == 0) {
+            printDeviceName(m_device);
+            Serial.println(F(" has no files."));
+            m_device = Device::NONE;
+            explore();
+            return;
+          }
+          audio.selectSource(m_device);
+          audio.queryFolderCount();
+          break;
+
         case Parameter::FOLDERCOUNT:
           m_folderCount = value;
-          m_folder = 1;
+          m_folder = 0;
           printDeviceName(m_device);
           Serial.print(F(" has "));
+          Serial.print(m_fileCount);
+          Serial.print(F(" files in "));
           Serial.print(m_folderCount);
           Serial.println(F(" folders."));
           if (m_folder < m_folderCount) {
             audio.queryFolderFileCount(m_folder);
           }
           break;
+
         case Parameter::FOLDERFILECOUNT:
-          printDeviceName(m_device);
-          Serial.print(F(" folder "));
-          Serial.print(m_folder);
-          Serial.print(F(" has "));
-          Serial.print(value);
-          Serial.println(F(" file(s)."));
+          m_fileTally += value;
+          if (value > 0) {
+            printDeviceName(m_device);
+            Serial.print(F(" folder \""));
+            printNumberedFolderName(m_folder);
+            Serial.print(F("\" has "));
+            Serial.print(value);
+            if (value == 1) Serial.println(F(" file."));
+            else            Serial.println(F(" files."));
+          }
           m_folder += 1;
           if (m_folder >= m_folderCount) {
+            auto const remainder = m_fileCount - m_fileTally;
+            if (remainder > 0) {
+              Serial.print(F("The other "));
+              if (remainder == 1) {
+                Serial.print(F("file"));
+              } else {
+                Serial.print(remainder);
+                Serial.print(F(" files"));
+              }
+              Serial.print(F(" may be in the root folder, unnumbered "));
+              Serial.print(F("folders (like \"MP3\"), or folders numbered "));
+              Serial.print(F("higher than \""));
+              printNumberedFolderName(m_folderCount-1);
+              Serial.println(F("\"."));
+            }
             m_device = Device::NONE;
             m_folderCount = 0;
             m_folder = 0;
@@ -102,6 +143,7 @@ class DeviceDiscoveryHooks : public AidtopiaSerialAudio::Hooks {
             audio.queryFolderFileCount(m_folder);
           }
           break;
+
         default:
           Serial.print(F("Unexpected response for parameter "));
           Serial.println(static_cast<uint8_t>(param), HEX);
@@ -118,8 +160,7 @@ class DeviceDiscoveryHooks : public AidtopiaSerialAudio::Hooks {
       else if (m_toexplore.has(Device::FLASH))  m_device = Device::FLASH;
       else                                      m_device = Device::NONE;
       m_toexplore.remove(m_device);
-      audio.selectSource(m_device);
-      audio.queryFolderCount();
+      audio.queryFileCount(m_device);
     }
 
     void printDevices(Devices devices) {
@@ -138,10 +179,17 @@ class DeviceDiscoveryHooks : public AidtopiaSerialAudio::Hooks {
       }
     }
 
+    void printNumberedFolderName(uint8_t folder) {
+      if (folder < 10) Serial.print('0');
+      Serial.print(folder);
+    }
+
     Devices m_toexplore;  // devices we want to explore
     Device m_device;  // the device we're currently exploring
+    uint16_t m_fileCount;  // the number of files on m_device
     uint16_t m_folderCount;  // the number of folders on m_device
     uint16_t m_folder;  // the current folder
+    uint16_t m_fileTally;  // count of files found in numbered folders
 };
 
 DeviceDiscoveryHooks hooks;

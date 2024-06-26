@@ -545,6 +545,7 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
         if (hooks != nullptr) {
             hooks->handleInitComplete(m_available);
         }
+        return;
     }
     
     if (isError(msg)) {
