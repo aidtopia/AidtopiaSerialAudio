@@ -3,6 +3,7 @@
 
 namespace aidtopia {
 
+#ifdef DEBUG
 static void dump(uint8_t const *buf, uint8_t len) {
     if (len == 0) return;
     Serial.print(buf[0], HEX);
@@ -12,11 +13,14 @@ static void dump(uint8_t const *buf, uint8_t len) {
     }
     Serial.println();
 }
+#endif
 
 bool SerialAudioCore::checkForIncomingMessage() {
     while (m_stream->available() > 0) {
         if (m_in.receive(m_stream->read())) {
+#ifdef DEBUG
             Serial.print(F("< ")); dump(m_in.getBytes(), m_in.getLength());
+#endif
             if (m_in.isValid()) return true;
         }
     }
@@ -30,7 +34,9 @@ void SerialAudioCore::send(Message const &msg, Feedback feedback) {
     const auto buf = out.getBytes();
     const auto len = out.getLength();
     m_stream->write(buf, len);
+#ifdef DEBUG
     Serial.print(F("> ")); dump(buf, len);
+#endif
 }
 
 bool SerialAudioCore::update(Message *msg) {

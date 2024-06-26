@@ -26,7 +26,6 @@ class DeviceDiscoveryHooks : public AidtopiaSerialAudio::Hooks {
       m_folder(0) {}
 
     void onInitComplete(Devices devices) override {
-      Serial.println(F("Initialization completed."));
       Serial.print(F("Devices Available:"));
       printDevices(devices);
       Serial.println();
@@ -43,8 +42,10 @@ class DeviceDiscoveryHooks : public AidtopiaSerialAudio::Hooks {
         onQueryResponse(Parameter::FOLDERFILECOUNT, 0);
         return;
       }
-      Serial.print(F("Error occurred: "));
-      Serial.println(static_cast<uint16_t>(code), HEX);
+      Serial.print(F("Error "));
+      Serial.print(static_cast<uint16_t>(code), HEX);
+      Serial.print(F(" after sending "));
+      Serial.println(static_cast<uint8_t>(msgid), HEX);
     }
 
     void onDeviceChange(Device device, DeviceChange change) override {

@@ -114,7 +114,7 @@ void SerialAudio::Hooks::handleDeviceChange(Device device, DeviceChange change) 
 
 void SerialAudio::Hooks::handleFinishedFile(Device device, uint16_t index) {
     if (device == m_deviceLastFinished && index == m_indexLastFinished) {
-        Serial.println(F("Duplicate notification suppressed."));
+        // Suppressing duplicate notification
         m_deviceLastFinished = Device::NONE;
         m_indexLastFinished = 0;
         return;
@@ -306,7 +306,6 @@ void SerialAudio::stopAdvert() {
 void SerialAudio::dispatch() {
     if (!m_state.ready()) return;
     if (m_queue.empty()) return;
-    Serial.println(F("Dispatching from queue"));
     dispatch(m_queue.peekFront());
     m_queue.popFront();
 }
@@ -338,6 +337,7 @@ bool SerialAudio::enqueue(Message::ID msgid, State::Flag flags, uint16_t data) {
 }
 
 void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
+#ifdef DEBUG
     Serial.print(F("onEvent ("));
     Serial.print(static_cast<uint8_t>(msg.getID()), HEX);
     Serial.print(F(", "));
@@ -350,6 +350,7 @@ void SerialAudio::onEvent(Message const &msg, Hooks *hooks) {
     if (m_state.has(State::DELAY))            Serial.print(F(" | DELAY"));
     if (m_state.has(State::UNINITIALIZED))    Serial.print(F(" | UNINITIALIZED"));
     Serial.println();
+#endif
     handleEvent(msg, hooks);
     
     // We might be ready to dispatch a queued command now.
@@ -412,7 +413,7 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
 
     if (isInitComplete(msg)) {
         if (m_state.poweringUp()) {
-            Serial.println(F("Got INITCOMPLETE on power up"));
+            // Got INITCOMPLETE on power up
             m_state.clear(State::UNINITIALIZED);
             m_timeout.cancel();
             if (hooks != nullptr) {
@@ -421,7 +422,7 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
             return;
         }
         if (m_state.sent() == ID::RESET) {
-            Serial.println(F("Reset completed"));
+            // Reset completed
             m_state.clear(State::UNINITIALIZED);
             m_timeout.cancel();
             if (hooks != nullptr) {
@@ -451,7 +452,6 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
     if (isQueryResponse(msg)) {
         if (m_state.has(State::EXPECT_RESPONSE)) {
             if (msg.getID() == m_state.sent()) {
-                Serial.println(F("Received expected query response"));
                 m_timeout.cancel();
                 m_state.clear(State::EXPECT_RESPONSE);
                 if (m_state.has(State::UNINITIALIZED)) {
@@ -523,13 +523,12 @@ void SerialAudio::handleEvent(Message const &msg, Hooks *hooks) {
     
     if (isTimeout(msg)) {
         if (m_state.testAndClear(State::DELAY)) {
-            Serial.println(F("Delay completed"));
             m_timeout.cancel();
             return;
         }
         if (m_state.poweringUp()) {
-            Serial.println(F("Didn't receive INITCOMPLETE on powerup."));
-            // Let's try querying the module to see whether it's already running.
+            // We didn't receive the INITCOMPLETE on power up. Let's try
+            // querying the module to see whether it's already running.
             dispatch(ID::STATUS, State::EXPECT_RESPONSE | State::UNINITIALIZED);
             return;
         }
@@ -563,25 +562,21 @@ bool SerialAudio::discoveryContinues() {
     auto const discoveryState =
         State::EXPECT_RESPONSE | State::UNINITIALIZED;
     if (m_tocheck.has(Device::USB)) {
-        Serial.println(F("Discovery tries USB."));
         m_tocheck.remove(Device::USB);
         dispatch(Message::ID::USBFILECOUNT, discoveryState);
         return true;
     }
     if (m_tocheck.has(Device::SDCARD)) {
-        Serial.println(F("Discovery tries SD card."));
         m_tocheck.remove(Device::SDCARD);
         dispatch(Message::ID::SDFILECOUNT, discoveryState);
         return true;
     }
     if (m_tocheck.has(Device::FLASH)) {
-        Serial.println(F("Discovery tries flash memory."));
         m_tocheck.remove(Device::FLASH);
         dispatch(Message::ID::FLASHFILECOUNT, discoveryState);
         return true;
     }
     m_state.clear(State::UNINITIALIZED);
-    Serial.println(F("Discovery finished."));
     return false;
 }
 
@@ -595,7 +590,6 @@ void SerialAudio::onPowerUp() {
     m_queue.clear();
     m_state = State();
     m_timeout.set(3000);
-    Serial.println(F("onPowerUp: Waiting for INITCOMPLETE."));
 }
 
 }
