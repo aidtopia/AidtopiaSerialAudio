@@ -262,11 +262,12 @@ class SerialAudio {
                     EXPECT_ACK2     = 0x02,
                     EXPECT_RESPONSE = 0x04,
                     DELAY           = 0x08,
-                    RESERVED4       = 0x10,
-                    RESERVED3       = 0x20,
-                    RESERVED2       = 0x40,
+                    CHECK_USB       = 0x10,
+                    CHECK_SD        = 0x20,
+                    CHECK_FLASH     = 0x40,
                     UNINITIALIZED   = 0x80,
                     
+                    DISCOVERY_FLAGS = CHECK_USB | CHECK_SD | CHECK_FLASH,
                     ALL_FLAGS       = 0xFF
                 };
 
@@ -275,6 +276,7 @@ class SerialAudio {
                     m_sent(msgid), m_flags(flags) {}
 
                 Message::ID sent() const { return m_sent; }
+                uint8_t flags() const { return m_flags; }
                 bool has(Flag flag) const { return (m_flags & flag) == flag; }
                 bool hasAny(Flag flags) const { return (m_flags & flags) != 0; }
                 void set(Flag flags) { m_flags |= flags; }
@@ -303,7 +305,7 @@ class SerialAudio {
         bool enqueue(Message::ID msgid, State::Flag flags, uint16_t data = 0);
         void onEvent(Message const &msg, Hooks *hooks);
         void handleEvent(Message const &msg, Hooks *hooks);
-        bool discoveryContinues();
+        bool continueDiscovery();
         void dispatch();
         void dispatch(Message::ID msgid, State::Flag flags, uint16_t data = 0);
         void dispatch(Command const &cmd);
@@ -313,9 +315,7 @@ class SerialAudio {
         Queue<Command, 4>       m_queue;
         State                   m_state;
         Timeout<MillisClock>    m_timeout;
-        // These are used by the state machine discover available devices.
         Devices                 m_available;
-        Devices                 m_tocheck;
 };
 
 SerialAudio::Devices operator|(SerialAudio::Device d1, SerialAudio::Device d2);
